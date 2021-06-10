@@ -1,0 +1,22 @@
+{
+    "name": "ts-template",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "build": "npx tsc && node build/main.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "@types/node": "^15.12.2",
+        "ts-node": "^10.0.0",
+        "typescript": "^4.3.2"
+    },
+    "dependencies": {
+        "@types/lodash": "^4.14.170",
+        "lodash": "^4.17.21"
+    }
+}
