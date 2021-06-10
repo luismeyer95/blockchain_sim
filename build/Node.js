@@ -15,14 +15,10 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from) {
         to[j] = from[i];
     return to;
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Node = exports.InitialTransaction = exports.SignedTransaction = void 0;
 var RSAEncryption_1 = require("./RSAEncryption");
 var utils_1 = require("./utils");
-var lodash_1 = __importDefault(require("lodash"));
 var SignedTransaction = /** @class */ (function () {
     function SignedTransaction(tx) {
         if (typeof tx === "string") {
@@ -41,8 +37,12 @@ var SignedTransaction = /** @class */ (function () {
         var signable = this.makeSignableObject();
         return RSAEncryption_1.verify(Buffer.from(JSON.stringify(signable)), this.input.from, this.signature);
     };
+    SignedTransaction.prototype.test = function () {
+        var input = {
+            from: RSAEncryption_1.serializeKey(this.input.from),
+        };
+    };
     SignedTransaction.prototype.makeSignableObject = function () {
-        // console.log(this.input.from);
         var input = {
             from: RSAEncryption_1.serializeKey(this.input.from),
         };
@@ -168,9 +168,9 @@ var Node = /** @class */ (function () {
         if (!lastOutput) {
             throw new Error("transaction error: missing last transaction output");
         }
-        var txProcessed = lodash_1.default.cloneDeep(tx);
+        var txProcessed = tx;
         txProcessed.outputs.push({
-            to: lodash_1.default.cloneDeep(tx.input.from),
+            to: tx.input.from,
             amount: lastOutput.amount - tx.getTotalAmount(),
         });
         txProcessed.sign(privateKey);
@@ -219,6 +219,14 @@ var Node = /** @class */ (function () {
         (_a = block.transactions).unshift.apply(_a, this.pendingTransactions);
         this.pendingTransactions = [];
         this.blockchain.unshift(block);
+    };
+    Node.prototype.printBlockchain = function () {
+        console.log(JSON.stringify(this.blockchain.slice().map(function (block) {
+            block.transactions = block.transactions.map(function (tx) {
+                return JSON.parse(tx.serialize());
+            });
+            return block;
+        }), null, 2));
     };
     return Node;
 }());

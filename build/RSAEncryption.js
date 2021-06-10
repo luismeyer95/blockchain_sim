@@ -31,22 +31,26 @@ var hash = function (data) {
 };
 exports.hash = hash;
 function deserializeKey(key, type) {
-    var keyCreationParams = {
-        key: Buffer.from(key, "base64"),
-        type: "pkcs1",
-        format: "der",
-    };
+    // const keyCreationParams = {
+    //     key: Buffer.from(key, "base64"),
+    //     type: "pkcs1",
+    //     format: "pem",
+    // };
+    // return type === "public"
+    //     ? crypto.createPublicKey(keyCreationParams as crypto.PublicKeyInput)
+    //     : crypto.createPrivateKey(keyCreationParams as crypto.PrivateKeyInput);
     return type === "public"
-        ? crypto_1.default.createPublicKey(keyCreationParams)
-        : crypto_1.default.createPrivateKey(keyCreationParams);
+        ? crypto_1.default.createPublicKey(key)
+        : crypto_1.default.createPrivateKey(key);
 }
 exports.deserializeKey = deserializeKey;
 function serializeKey(key) {
+    debugger;
     var serializedKey = key.export({
         type: "pkcs1",
-        format: "der",
+        format: "pem",
     });
-    return serializedKey.toString("base64");
+    return serializedKey.toString();
 }
 exports.serializeKey = serializeKey;
 function serializeKeyPair(keypair) {

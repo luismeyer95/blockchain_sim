@@ -1,3 +1,4 @@
+import { debug } from "console";
 import crypto, { KeyObject, KeyPairKeyObjectResult } from "crypto";
 
 export const sign = (data: Buffer, privateKey: KeyObject): Buffer => {
@@ -46,22 +47,27 @@ export function deserializeKey(
     key: Base64SerializedKey,
     type: "public" | "private"
 ): KeyObject {
-    const keyCreationParams = {
-        key: Buffer.from(key, "base64"),
-        type: "pkcs1",
-        format: "der",
-    };
+    // const keyCreationParams = {
+    //     key: Buffer.from(key, "base64"),
+    //     type: "pkcs1",
+    //     format: "pem",
+    // };
+    // return type === "public"
+    //     ? crypto.createPublicKey(keyCreationParams as crypto.PublicKeyInput)
+    //     : crypto.createPrivateKey(keyCreationParams as crypto.PrivateKeyInput);
+
     return type === "public"
-        ? crypto.createPublicKey(keyCreationParams as crypto.PublicKeyInput)
-        : crypto.createPrivateKey(keyCreationParams as crypto.PrivateKeyInput);
+        ? crypto.createPublicKey(key)
+        : crypto.createPrivateKey(key);
 }
 
 export function serializeKey(key: KeyObject): Base64SerializedKey {
-    const serializedKey: Buffer = key.export({
+    debugger;
+    const serializedKey = key.export({
         type: "pkcs1",
-        format: "der",
+        format: "pem",
     });
-    return serializedKey.toString("base64");
+    return serializedKey.toString();
 }
 
 export function serializeKeyPair(

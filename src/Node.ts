@@ -52,9 +52,13 @@ export class SignedTransaction implements ISignedTransaction {
         );
     }
 
-    makeSignableObject() {
-        // console.log(this.input.from);
+    test() {
+        const input: Input<Base64SerializedKey> = {
+            from: serializeKey(this.input.from),
+        };
+    }
 
+    makeSignableObject() {
         const input: Input<Base64SerializedKey> = {
             from: serializeKey(this.input.from),
         };
@@ -206,9 +210,9 @@ export class Node {
                 "transaction error: missing last transaction output"
             );
         }
-        const txProcessed: SignedTransaction = _.cloneDeep(tx);
+        const txProcessed: SignedTransaction = tx;
         txProcessed.outputs.push({
-            to: _.cloneDeep(tx.input.from),
+            to: tx.input.from,
             amount: lastOutput.amount - tx.getTotalAmount(),
         });
         txProcessed.sign(privateKey);
@@ -264,5 +268,20 @@ export class Node {
         block.transactions.unshift(...this.pendingTransactions);
         this.pendingTransactions = [];
         this.blockchain.unshift(block);
+    }
+
+    printBlockchain() {
+        console.log(
+            JSON.stringify(
+                this.blockchain.slice().map((block) => {
+                    block.transactions = block.transactions.map((tx) =>
+                        JSON.parse(tx.serialize())
+                    );
+                    return block;
+                }),
+                null,
+                2
+            )
+        );
     }
 }
