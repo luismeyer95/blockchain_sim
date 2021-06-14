@@ -34,11 +34,18 @@ export class SignedTransaction implements ISignedTransaction {
 
     isValid(): boolean {
         if (!this.signature) return false;
+        let validOutputs: boolean = true;
+        this.outputs.forEach((output: Output<KeyObject>) => {
+            if (output.amount < 0) validOutputs = false;
+        });
         const signable = this.makeSignableObject();
-        return verify(
-            Buffer.from(JSON.stringify(signable)),
-            this.input.from,
-            this.signature
+        return (
+            validOutputs &&
+            verify(
+                Buffer.from(JSON.stringify(signable)),
+                this.input.from,
+                this.signature
+            )
         );
     }
 
@@ -74,12 +81,13 @@ export class SignedTransaction implements ISignedTransaction {
     }
 
     serialize(...args: any): string {
-        if (!this.isValid())
-            throw new Error(
-                "transaction error: trying to serialize invalid transaction"
-            );
+        if (!this.isValid()) {
+            const strerror =
+                "transaction error: trying to serialize invalid transaction";
+            throw new Error(strerror);
+        }
         const signable = this.makeSignableObject();
-        const signature = this.signature?.toString("base64");
+        const signature = this.signature!.toString("base64");
         return JSON.stringify({ ...signable, signature }, ...args);
     }
 

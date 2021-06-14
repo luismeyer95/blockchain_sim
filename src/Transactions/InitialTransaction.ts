@@ -46,5 +46,10 @@ export class InitialTransaction implements IInitialTransaction {
             };
         });
         this.timestamp = timestamp;
+        // the following operation defines the asymmetricKeyType
+        // and restores the og state for some reason
+        this.outputs.forEach((output) => {
+            output.to.asymmetricKeyType;
+        });
     }
 }

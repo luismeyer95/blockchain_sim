@@ -1,4 +1,4 @@
-import { KeyPairKeyObjectResult } from "crypto";
+import crypto, { KeyPairKeyObjectResult } from "crypto";
 import {
     genKeyPair,
     sign,
@@ -6,7 +6,7 @@ import {
     hash,
     serializeKeyPair,
     deserializeKeyPair,
-    deserializeKey,
+    findNonce,
 } from "./Encryption";
 
 describe("Encryption module tests", () => {
@@ -36,5 +36,25 @@ describe("Encryption module tests", () => {
         const back = deserializeKeyPair(serial);
 
         signAndVerify(back, genKeyPair());
+    });
+
+    test("hash", () => {
+        const h = hash(Buffer.from("giraffe")).digest();
+        const cmp = crypto.createHash("sha256").update("giraffe").digest();
+        expect(h.compare(cmp)).toBe(0);
+    });
+
+    test("find nonce", () => {
+        const obj = {
+            name: "luis",
+            age: 26,
+        };
+        const { hash, nonce } = findNonce<typeof obj>(obj, 12);
+        const u32 = hash.readUInt32LE();
+        const mask = u32 & 0x0000f0ff;
+        expect(mask).toEqual(0);
+
+        expect(findNonce.bind(null, obj, -1)).toThrow();
+        expect(findNonce.bind(null, obj, 33)).toThrow();
     });
 });

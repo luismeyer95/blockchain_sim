@@ -52,7 +52,7 @@ describe("SignedTransaction class", () => {
         });
         expect(tx.isValid()).toBeFalsy();
 
-        expect(tx.serialize).toThrowError();
+        expect(tx.serialize.bind(tx)).toThrowError();
 
         tx.sign(account2.privateKey);
         expect(tx.isValid()).toBeFalsy();
@@ -75,6 +75,20 @@ describe("SignedTransaction class", () => {
         expect(deserializedTx.isValid()).toBeTruthy();
         deserializedTx.sign(account2.privateKey);
         expect(deserializedTx.isValid()).toBeFalsy();
+    });
+
+    test("deserial bad object", () => {
+        let tx = new SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [{ to: account2.publicKey, amount: 3 }],
+        });
+        tx.sign(account1.privateKey);
+        const serial: string = tx.serialize();
+        const badobj: Partial<SignedTransaction> = JSON.parse(serial);
+        badobj.timestamp = undefined;
+        const badserial: string = JSON.stringify(badobj);
+
+        expect(tx.deserialize.bind(tx, badserial)).toThrowError();
     });
 });
 

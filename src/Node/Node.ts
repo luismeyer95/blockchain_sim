@@ -19,8 +19,6 @@ export class Node {
     constructor(blockchain?: Block[]) {
         this.blockchain = blockchain ?? [];
         this.pendingTransactions = [];
-        // if (!this.findLastTransactionOutput(keypair.publicKey))
-        //     this.createInitialTransaction(this.keypair, 10);
     }
 
     createInitialTransaction(keypair: KeyPairKeyObjectResult, amount: number) {
@@ -29,7 +27,6 @@ export class Node {
             timestamp: Date.now(),
         });
         this.validateTransactionData(initTx);
-        this.validateTransactionSignature(initTx);
         this.broadcastTransaction(initTx);
     }
 
@@ -62,12 +59,12 @@ export class Node {
         });
         txProcessed.sign(privateKey);
         this.validateTransactionData(txProcessed);
-        this.validateTransactionSignature(txProcessed);
         this.broadcastTransaction(txProcessed);
     }
 
     validateTransactionData(tx: SignedTransaction | InitialTransaction): void {
         if (tx instanceof SignedTransaction) {
+            this.validateTransactionSignature(tx);
             const lastOutput = this.findLastTransactionOutput(tx.input.from);
             if (lastOutput) {
                 if (tx.getTotalAmount() > lastOutput.amount)
@@ -90,17 +87,11 @@ export class Node {
         }
     }
 
-    validateTransactionSignature(
-        tx: SignedTransaction | InitialTransaction
-    ): void {
-        if (tx instanceof InitialTransaction) {
-            return;
-        } else {
-            if (!tx.isValid())
-                throw new Error(
-                    "transaction creation error: invalid transaction signature"
-                );
-        }
+    validateTransactionSignature(tx: SignedTransaction): void {
+        if (!tx.isValid())
+            throw new Error(
+                "transaction creation error: invalid transaction signature"
+            );
     }
 
     broadcastTransaction(tx: SignedTransaction | InitialTransaction) {
@@ -116,18 +107,18 @@ export class Node {
         this.blockchain.unshift(block);
     }
 
-    printBlockchain() {
-        console.log(
-            JSON.stringify(
-                this.blockchain.slice().map((block) => {
-                    block.transactions = block.transactions.map((tx) =>
-                        JSON.parse(tx.serialize())
-                    );
-                    return block;
-                }),
-                null,
-                2
-            )
-        );
-    }
+    // printBlockchain() {
+    //     console.log(
+    //         JSON.stringify(
+    //             this.blockchain.slice().map((block) => {
+    //                 block.transactions = block.transactions.map((tx) =>
+    //                     JSON.parse(tx.serialize())
+    //                 );
+    //                 return block;
+    //             }),
+    //             null,
+    //             2
+    //         )
+    //     );
+    // }
 }

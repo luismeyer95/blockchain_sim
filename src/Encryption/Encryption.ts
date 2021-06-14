@@ -96,7 +96,7 @@ export const findNonce = <T>(
     data: ExcludeHashNonce<T>,
     leadingZeroBits: number
 ): { hash: Buffer; nonce: number } => {
-    if (leadingZeroBits < 0 || leadingZeroBits >= 32)
+    if (leadingZeroBits < 0 || leadingZeroBits > 32)
         throw new Error("findNonce error: invalid leadingZeroBits argument");
 
     const bitstr = "0".repeat(32 - leadingZeroBits).padStart(32, "1");
