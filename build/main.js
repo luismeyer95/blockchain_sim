@@ -1,28 +1,25 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var RSAEncryption_1 = require("./RSAEncryption");
-// import { WalletAccount } from "./Account";
-var acc1 = RSAEncryption_1.genKeyPair();
-var dataToSign = Buffer.from("giraffe");
-var signature = RSAEncryption_1.sign(dataToSign, acc1.privateKey);
-// console.log(verify(dataToSign, acc1.publicKey, signature));
+var Node_1 = require("./Node/Node");
+var Transactions_1 = require("./Transactions/Transactions");
+var Encryption_1 = require("./Encryption/Encryption");
 // ///
-// const account1 = genKeyPair();
-// const account2 = genKeyPair();
-// const node = new Node(account1);
-// node.mineBlock();
-// const tx = new SignedTransaction({
-//     input: { from: account1.publicKey },
-//     outputs: [{ to: account2.publicKey, amount: 3 }],
-// });
-// node.signAndCreateTransaction(tx, account1.privateKey);
-// node.mineBlock();
-// node.printBlockchain();
+var account1 = Encryption_1.genKeyPair();
+var account2 = Encryption_1.genKeyPair();
+var node = new Node_1.Node(account1);
+node.mineBlock();
+var tx = new Transactions_1.SignedTransaction({
+    input: { from: account1.publicKey },
+    outputs: [{ to: account2.publicKey, amount: 3 }],
+});
+node.signAndCreateTransaction(tx, account1.privateKey);
+node.mineBlock();
+node.printBlockchain();
 var findGoldNonce = function (data) {
     var obj = { data: data, nonce: 0 };
     var u32, hashRes, buf;
     do {
-        hashRes = RSAEncryption_1.hash(Buffer.from(JSON.stringify(obj)));
+        hashRes = Encryption_1.hash(Buffer.from(JSON.stringify(obj)));
         buf = hashRes.copy().digest();
         u32 = buf.readUInt32BE();
         obj.nonce += 1;

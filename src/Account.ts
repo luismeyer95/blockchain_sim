@@ -11,7 +11,7 @@ import {
     Base64SerializedKey,
     Base64SerializedKeyPair,
     deserializeKeyPair,
-} from "./RSAEncryption";
+} from "./Encryption/Encryption";
 
 export class WalletAccount {
     public keypair: KeyPairKeyObjectResult;

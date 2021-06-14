@@ -87,3 +87,24 @@ export function deserializeKeyPair(
         privateKey: deserializeKey(serializedKeyPair.privateKey, "private"),
     };
 }
+
+export const findNonce = (data: any, leadingZeroBits: number) => {
+    if (leadingZeroBits < 0 || leadingZeroBits >= 32)
+        throw new Error("findNonce error: invalid leadingZeroBits argument");
+
+    const bitstr = new Array(leadingZeroBits).fill(0);
+    console.log(bitstr);
+
+    const obj = { data, nonce: 0 };
+    let u32, hashRes, buf;
+    do {
+        hashRes = hash(Buffer.from(JSON.stringify(obj)));
+        buf = hashRes.copy().digest();
+        u32 = buf.readUInt32BE();
+        obj.nonce += 1;
+    } while (u32 & 0xfffff000);
+
+    // console.log(obj.nonce);
+
+    return buf;
+};

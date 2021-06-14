@@ -1,30 +1,36 @@
 "use strict";
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
+var __assign =
+    (this && this.__assign) ||
+    function () {
+        __assign =
+            Object.assign ||
+            function (t) {
+                for (var s, i = 1, n = arguments.length; i < n; i++) {
+                    s = arguments[i];
+                    for (var p in s)
+                        if (Object.prototype.hasOwnProperty.call(s, p))
+                            t[p] = s[p];
+                }
+                return t;
+            };
+        return __assign.apply(this, arguments);
     };
-    return __assign.apply(this, arguments);
-};
-var __spreadArray = (this && this.__spreadArray) || function (to, from) {
-    for (var i = 0, il = from.length, j = to.length; i < il; i++, j++)
-        to[j] = from[i];
-    return to;
-};
+var __spreadArray =
+    (this && this.__spreadArray) ||
+    function (to, from) {
+        for (var i = 0, il = from.length, j = to.length; i < il; i++, j++)
+            to[j] = from[i];
+        return to;
+    };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Node = exports.InitialTransaction = exports.SignedTransaction = void 0;
-var RSAEncryption_1 = require("./RSAEncryption");
+var Encryption_1 = require("./Encryption");
 var utils_1 = require("./utils");
 var SignedTransaction = /** @class */ (function () {
     function SignedTransaction(tx) {
         if (typeof tx === "string") {
             this.deserialize(tx);
-        }
-        else {
+        } else {
             this.input = tx.input;
             this.outputs = tx.outputs;
             this.signature = tx.signature;
@@ -32,25 +38,26 @@ var SignedTransaction = /** @class */ (function () {
         }
     }
     SignedTransaction.prototype.isValid = function () {
-        if (!this.signature)
-            return false;
+        if (!this.signature) return false;
         var signable = this.makeSignableObject();
-        return RSAEncryption_1.verify(Buffer.from(JSON.stringify(signable)), this.input.from, this.signature);
+        return Encryption_1.verify(
+            Buffer.from(JSON.stringify(signable)),
+            this.input.from,
+            this.signature
+        );
     };
     SignedTransaction.prototype.test = function () {
         var input = {
-            from: RSAEncryption_1.serializeKey(this.input.from),
+            from: Encryption_1.serializeKey(this.input.from),
         };
     };
     SignedTransaction.prototype.makeSignableObject = function () {
         var input = {
-            from: RSAEncryption_1.serializeKey(this.input.from),
+            from: Encryption_1.serializeKey(this.input.from),
         };
-        var outputs = this.outputs
-            .slice()
-            .map(function (output) {
+        var outputs = this.outputs.slice().map(function (output) {
             return {
-                to: RSAEncryption_1.serializeKey(output.to),
+                to: Encryption_1.serializeKey(output.to),
                 amount: output.amount,
             };
         });
@@ -59,11 +66,16 @@ var SignedTransaction = /** @class */ (function () {
     };
     SignedTransaction.prototype.getTotalAmount = function () {
         var fullAmount = 0;
-        this.outputs.forEach(function (output) { return (fullAmount += output.amount); });
+        this.outputs.forEach(function (output) {
+            return (fullAmount += output.amount);
+        });
         return fullAmount;
     };
     SignedTransaction.prototype.sign = function (privateKey) {
-        this.signature = RSAEncryption_1.sign(Buffer.from(JSON.stringify(this.makeSignableObject())), privateKey);
+        this.signature = Encryption_1.sign(
+            Buffer.from(JSON.stringify(this.makeSignableObject())),
+            privateKey
+        );
     };
     SignedTransaction.prototype.serialize = function () {
         var _a;
@@ -72,17 +84,34 @@ var SignedTransaction = /** @class */ (function () {
             args[_i] = arguments[_i];
         }
         if (!this.isValid())
-            throw new Error("transaction error: trying to serialize invalid transaction");
+            throw new Error(
+                "transaction error: trying to serialize invalid transaction"
+            );
         var signable = this.makeSignableObject();
-        var signature = (_a = this.signature) === null || _a === void 0 ? void 0 : _a.toString("base64");
-        return JSON.stringify.apply(JSON, __spreadArray([__assign(__assign({}, signable), { signature: signature })], args));
+        var signature =
+            (_a = this.signature) === null || _a === void 0
+                ? void 0
+                : _a.toString("base64");
+        return JSON.stringify.apply(
+            JSON,
+            __spreadArray(
+                [__assign(__assign({}, signable), { signature: signature })],
+                args
+            )
+        );
     };
     SignedTransaction.prototype.deserialize = function (tx) {
-        var _a = JSON.parse(tx), input = _a.input, outputs = _a.outputs, signature = _a.signature, timestamp = _a.timestamp;
-        this.input = { from: RSAEncryption_1.deserializeKey(input.from, "public") };
+        var _a = JSON.parse(tx),
+            input = _a.input,
+            outputs = _a.outputs,
+            signature = _a.signature,
+            timestamp = _a.timestamp;
+        this.input = {
+            from: Encryption_1.deserializeKey(input.from, "public"),
+        };
         this.outputs = outputs.map(function (output) {
             return {
-                to: RSAEncryption_1.deserializeKey(output.to, "public"),
+                to: Encryption_1.deserializeKey(output.to, "public"),
                 amount: output.amount,
             };
         });
@@ -92,14 +121,13 @@ var SignedTransaction = /** @class */ (function () {
         this.timestamp = timestamp;
     };
     return SignedTransaction;
-}());
+})();
 exports.SignedTransaction = SignedTransaction;
 var InitialTransaction = /** @class */ (function () {
     function InitialTransaction(tx) {
         if (typeof tx === "string") {
             this.deserialize(tx);
-        }
-        else {
+        } else {
             this.outputs = tx.outputs;
             this.timestamp = tx.timestamp;
         }
@@ -109,34 +137,39 @@ var InitialTransaction = /** @class */ (function () {
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        var outputs = this.outputs
-            .slice()
-            .map(function (output) {
+        var outputs = this.outputs.slice().map(function (output) {
             return {
-                to: RSAEncryption_1.serializeKey(output.to),
+                to: Encryption_1.serializeKey(output.to),
                 amount: output.amount,
             };
         });
         var timestamp = this.timestamp;
-        return JSON.stringify.apply(JSON, __spreadArray([{ outputs: outputs, timestamp: timestamp }], args));
+        return JSON.stringify.apply(
+            JSON,
+            __spreadArray([{ outputs: outputs, timestamp: timestamp }], args)
+        );
     };
     InitialTransaction.prototype.deserialize = function (tx) {
-        var _a = JSON.parse(tx), outputs = _a.outputs, timestamp = _a.timestamp;
+        var _a = JSON.parse(tx),
+            outputs = _a.outputs,
+            timestamp = _a.timestamp;
         this.outputs = outputs;
         this.timestamp = timestamp;
     };
     return InitialTransaction;
-}());
+})();
 exports.InitialTransaction = InitialTransaction;
 var Block = /** @class */ (function () {
     function Block() {
         this.transactions = [];
     }
     return Block;
-}());
+})();
 var Node = /** @class */ (function () {
     function Node(keypair) {
-        if (keypair === void 0) { keypair = RSAEncryption_1.genKeyPair(); }
+        if (keypair === void 0) {
+            keypair = Encryption_1.genKeyPair();
+        }
         this.blockchain = [];
         this.pendingTransactions = [];
         this.keypair = keypair;
@@ -156,8 +189,7 @@ var Node = /** @class */ (function () {
         var output = utils_1.dig(this.blockchain, function (block) {
             return utils_1.dig(block.transactions, function (tx) {
                 return utils_1.dig(tx.outputs, function (output) {
-                    if (output.to === publicKey)
-                        return output;
+                    if (output.to === publicKey) return output;
                 });
             });
         });
@@ -166,7 +198,9 @@ var Node = /** @class */ (function () {
     Node.prototype.signAndCreateTransaction = function (tx, privateKey) {
         var lastOutput = this.findLastTransactionOutput(tx.input.from);
         if (!lastOutput) {
-            throw new Error("transaction error: missing last transaction output");
+            throw new Error(
+                "transaction error: missing last transaction output"
+            );
         }
         var txProcessed = tx;
         txProcessed.outputs.push({
@@ -184,29 +218,32 @@ var Node = /** @class */ (function () {
             var lastOutput = this.findLastTransactionOutput(tx.input.from);
             if (lastOutput) {
                 if (tx.getTotalAmount() > lastOutput.amount)
-                    throw new Error("transaction error: insufficient account funds");
+                    throw new Error(
+                        "transaction error: insufficient account funds"
+                    );
                 if (tx.getTotalAmount() < lastOutput.amount)
                     throw new Error("transaction error: unspent input");
-            }
-            else {
+            } else {
                 throw new Error("transaction error: no funds on this account");
             }
-        }
-        else {
+        } else {
             tx.outputs.forEach(function (output) {
                 var lastOutput = _this.findLastTransactionOutput(output.to);
                 if (lastOutput)
-                    throw new Error("transaction error: cannot create initial transaction on funded account");
+                    throw new Error(
+                        "transaction error: cannot create initial transaction on funded account"
+                    );
             });
         }
     };
     Node.prototype.validateTransactionSignature = function (tx) {
         if (tx instanceof InitialTransaction) {
             return;
-        }
-        else {
+        } else {
             if (!tx.isValid())
-                throw new Error("transaction creation error: invalid transaction signature");
+                throw new Error(
+                    "transaction creation error: invalid transaction signature"
+                );
         }
     };
     Node.prototype.broadcastTransaction = function (tx) {
@@ -215,19 +252,27 @@ var Node = /** @class */ (function () {
     Node.prototype.mineBlock = function () {
         var _a;
         var block = new Block();
-        this.pendingTransactions.sort(function (a, b) { return b.timestamp - a.timestamp; });
+        this.pendingTransactions.sort(function (a, b) {
+            return b.timestamp - a.timestamp;
+        });
         (_a = block.transactions).unshift.apply(_a, this.pendingTransactions);
         this.pendingTransactions = [];
         this.blockchain.unshift(block);
     };
     Node.prototype.printBlockchain = function () {
-        console.log(JSON.stringify(this.blockchain.slice().map(function (block) {
-            block.transactions = block.transactions.map(function (tx) {
-                return JSON.parse(tx.serialize());
-            });
-            return block;
-        }), null, 2));
+        console.log(
+            JSON.stringify(
+                this.blockchain.slice().map(function (block) {
+                    block.transactions = block.transactions.map(function (tx) {
+                        return JSON.parse(tx.serialize());
+                    });
+                    return block;
+                }),
+                null,
+                2
+            )
+        );
     };
     return Node;
-}());
+})();
 exports.Node = Node;
