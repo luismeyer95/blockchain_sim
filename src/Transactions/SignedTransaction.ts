@@ -42,12 +42,6 @@ export class SignedTransaction implements ISignedTransaction {
         );
     }
 
-    test() {
-        const input: Input<Base64SerializedKey> = {
-            from: serializeKey(this.input.from),
-        };
-    }
-
     makeSignableObject() {
         const input: Input<Base64SerializedKey> = {
             from: serializeKey(this.input.from),

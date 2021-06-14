@@ -88,23 +88,28 @@ export function deserializeKeyPair(
     };
 }
 
-export const findNonce = (data: any, leadingZeroBits: number) => {
+type ExcludeHashNonce<T> = Omit<T, "hash" | "nonce"> extends T
+    ? Omit<T, "hash" | "nonce">
+    : never;
+
+export const findNonce = <T>(
+    data: ExcludeHashNonce<T>,
+    leadingZeroBits: number
+): { hash: Buffer; nonce: number } => {
     if (leadingZeroBits < 0 || leadingZeroBits >= 32)
         throw new Error("findNonce error: invalid leadingZeroBits argument");
 
-    const bitstr = new Array(leadingZeroBits).fill(0);
-    console.log(bitstr);
+    const bitstr = "0".repeat(32 - leadingZeroBits).padStart(32, "1");
+    const bitnum = parseInt(bitstr, 2);
 
-    const obj = { data, nonce: 0 };
+    const obj = { ...data, nonce: 0 };
     let u32, hashRes, buf;
     do {
         hashRes = hash(Buffer.from(JSON.stringify(obj)));
         buf = hashRes.copy().digest();
         u32 = buf.readUInt32BE();
         obj.nonce += 1;
-    } while (u32 & 0xfffff000);
+    } while (u32 & bitnum);
 
-    // console.log(obj.nonce);
-
-    return buf;
+    return { hash: buf, nonce: obj.nonce - 1 };
 };

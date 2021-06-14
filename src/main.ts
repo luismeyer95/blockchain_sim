@@ -30,7 +30,3 @@ import { exit } from "process";
 // node.mineBlock();
 
 // node.printBlockchain();
-
-// console.log(findNonce("jello", 5));
-// console.log(findNonce("mello", 5));
-// console.log(findNonce("hello", 5));

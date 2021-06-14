@@ -1,9 +1,20 @@
 "use strict";
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deserializeKeyPair = exports.serializeKeyPair = exports.serializeKey = exports.deserializeKey = exports.hash = exports.genKeyPair = exports.verify = exports.sign = void 0;
+exports.findNonce = exports.deserializeKeyPair = exports.serializeKeyPair = exports.serializeKey = exports.deserializeKey = exports.hash = exports.genKeyPair = exports.verify = exports.sign = void 0;
 var crypto_1 = __importDefault(require("crypto"));
 var sign = function (data, privateKey) {
     return crypto_1.default.sign("sha256", data, {
@@ -67,3 +78,19 @@ function deserializeKeyPair(serializedKeyPair) {
     };
 }
 exports.deserializeKeyPair = deserializeKeyPair;
+var findNonce = function (data, leadingZeroBits) {
+    if (leadingZeroBits < 0 || leadingZeroBits >= 32)
+        throw new Error("findNonce error: invalid leadingZeroBits argument");
+    var bitstr = "0".repeat(32 - leadingZeroBits).padStart(32, "1");
+    var bitnum = parseInt(bitstr, 2);
+    var obj = __assign(__assign({}, data), { nonce: 0 });
+    var u32, hashRes, buf;
+    do {
+        hashRes = exports.hash(Buffer.from(JSON.stringify(obj)));
+        buf = hashRes.copy().digest();
+        u32 = buf.readUInt32BE();
+        obj.nonce += 1;
+    } while (u32 & bitnum);
+    return { hash: buf, nonce: obj.nonce - 1 };
+};
+exports.findNonce = findNonce;

@@ -7,9 +7,7 @@ var Block_1 = require("../Block/Block");
 var Transactions_1 = require("../Transactions/Transactions");
 var Node = /** @class */ (function () {
     function Node(keypair) {
-        if (keypair === void 0) {
-            keypair = Encryption_1.genKeyPair();
-        }
+        if (keypair === void 0) { keypair = Encryption_1.genKeyPair(); }
         this.blockchain = [];
         this.pendingTransactions = [];
         this.keypair = keypair;
@@ -29,7 +27,8 @@ var Node = /** @class */ (function () {
         var output = utils_1.dig(this.blockchain, function (block) {
             return utils_1.dig(block.transactions, function (tx) {
                 return utils_1.dig(tx.outputs, function (output) {
-                    if (output.to === publicKey) return output;
+                    if (output.to === publicKey)
+                        return output;
                 });
             });
         });
@@ -38,9 +37,7 @@ var Node = /** @class */ (function () {
     Node.prototype.signAndCreateTransaction = function (tx, privateKey) {
         var lastOutput = this.findLastTransactionOutput(tx.input.from);
         if (!lastOutput) {
-            throw new Error(
-                "transaction error: missing last transaction output"
-            );
+            throw new Error("transaction error: missing last transaction output");
         }
         var txProcessed = tx;
         txProcessed.outputs.push({
@@ -58,32 +55,29 @@ var Node = /** @class */ (function () {
             var lastOutput = this.findLastTransactionOutput(tx.input.from);
             if (lastOutput) {
                 if (tx.getTotalAmount() > lastOutput.amount)
-                    throw new Error(
-                        "transaction error: insufficient account funds"
-                    );
+                    throw new Error("transaction error: insufficient account funds");
                 if (tx.getTotalAmount() < lastOutput.amount)
                     throw new Error("transaction error: unspent input");
-            } else {
+            }
+            else {
                 throw new Error("transaction error: no funds on this account");
             }
-        } else {
+        }
+        else {
             tx.outputs.forEach(function (output) {
                 var lastOutput = _this.findLastTransactionOutput(output.to);
                 if (lastOutput)
-                    throw new Error(
-                        "transaction error: cannot create initial transaction on funded account"
-                    );
+                    throw new Error("transaction error: cannot create initial transaction on funded account");
             });
         }
     };
     Node.prototype.validateTransactionSignature = function (tx) {
         if (tx instanceof Transactions_1.InitialTransaction) {
             return;
-        } else {
+        }
+        else {
             if (!tx.isValid())
-                throw new Error(
-                    "transaction creation error: invalid transaction signature"
-                );
+                throw new Error("transaction creation error: invalid transaction signature");
         }
     };
     Node.prototype.broadcastTransaction = function (tx) {
@@ -92,27 +86,19 @@ var Node = /** @class */ (function () {
     Node.prototype.mineBlock = function () {
         var _a;
         var block = new Block_1.Block();
-        this.pendingTransactions.sort(function (a, b) {
-            return b.timestamp - a.timestamp;
-        });
+        this.pendingTransactions.sort(function (a, b) { return b.timestamp - a.timestamp; });
         (_a = block.transactions).unshift.apply(_a, this.pendingTransactions);
         this.pendingTransactions = [];
         this.blockchain.unshift(block);
     };
     Node.prototype.printBlockchain = function () {
-        console.log(
-            JSON.stringify(
-                this.blockchain.slice().map(function (block) {
-                    block.transactions = block.transactions.map(function (tx) {
-                        return JSON.parse(tx.serialize());
-                    });
-                    return block;
-                }),
-                null,
-                2
-            )
-        );
+        console.log(JSON.stringify(this.blockchain.slice().map(function (block) {
+            block.transactions = block.transactions.map(function (tx) {
+                return JSON.parse(tx.serialize());
+            });
+            return block;
+        }), null, 2));
     };
     return Node;
-})();
+}());
 exports.Node = Node;

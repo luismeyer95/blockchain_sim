@@ -12,9 +12,7 @@ describe("Encryption module tests", function () {
         valid = Encryption_1.verify(dataToSign, acc1.publicKey, signature);
         expect(valid).toEqual(false);
     };
-    beforeEach(function () {
-        return (acc1 = Encryption_1.genKeyPair());
-    });
+    beforeEach(function () { return (acc1 = Encryption_1.genKeyPair()); });
     test("signing and verifying buffers", function () {
         signAndVerify(acc1, Encryption_1.genKeyPair());
     });
