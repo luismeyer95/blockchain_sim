@@ -36,11 +36,6 @@ var SignedTransaction = /** @class */ (function () {
         var signable = this.makeSignableObject();
         return Encryption_1.verify(Buffer.from(JSON.stringify(signable)), this.input.from, this.signature);
     };
-    SignedTransaction.prototype.test = function () {
-        var input = {
-            from: Encryption_1.serializeKey(this.input.from),
-        };
-    };
     SignedTransaction.prototype.makeSignableObject = function () {
         var input = {
             from: Encryption_1.serializeKey(this.input.from),

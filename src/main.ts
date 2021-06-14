@@ -13,7 +13,7 @@ import {
 import readline from "readline";
 import { exit } from "process";
 
-// ///
+///
 // const account1 = genKeyPair();
 // const account2 = genKeyPair();
 // const node = new Node(account1);
@@ -25,7 +25,7 @@ import { exit } from "process";
 //     outputs: [{ to: account2.publicKey, amount: 3 }],
 // });
 
-// node.signAndCreateTransaction(tx, account1.privateKey);
+// node.createSignedTransaction(tx, account1.privateKey);
 
 // node.mineBlock();
 

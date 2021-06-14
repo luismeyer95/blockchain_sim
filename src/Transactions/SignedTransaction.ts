@@ -8,7 +8,7 @@ import {
     deserializeKey,
 } from "../Encryption/Encryption";
 
-interface ISignedTransaction {
+export interface ISignedTransaction {
     input: Input<KeyObject>;
     outputs: Output<KeyObject>[];
     signature?: Buffer;

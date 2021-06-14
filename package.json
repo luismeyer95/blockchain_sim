@@ -28,7 +28,7 @@
         "rootDir": "./src",
         "clearMocks": true,
         "collectCoverage": true,
-        "coverageDirectory": "src/coverage",
+        "coverageDirectory": "coverage",
         "coverageProvider": "v8",
         "testEnvironment": "node"
     }

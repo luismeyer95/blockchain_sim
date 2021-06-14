@@ -16,12 +16,11 @@ export class Node {
     public pendingTransactions: Array<SignedTransaction | InitialTransaction>;
     public keypair: KeyPairKeyObjectResult;
 
-    constructor(keypair: KeyPairKeyObjectResult = genKeyPair()) {
-        this.blockchain = [];
+    constructor(blockchain?: Block[]) {
+        this.blockchain = blockchain ?? [];
         this.pendingTransactions = [];
-        this.keypair = keypair;
-        if (!this.findLastTransactionOutput(keypair.publicKey))
-            this.createInitialTransaction(this.keypair, 10);
+        // if (!this.findLastTransactionOutput(keypair.publicKey))
+        //     this.createInitialTransaction(this.keypair, 10);
     }
 
     createInitialTransaction(keypair: KeyPairKeyObjectResult, amount: number) {
@@ -49,7 +48,7 @@ export class Node {
         return output;
     }
 
-    signAndCreateTransaction(tx: SignedTransaction, privateKey: KeyObject) {
+    createSignedTransaction(tx: SignedTransaction, privateKey: KeyObject) {
         const lastOutput = this.findLastTransactionOutput(tx.input.from);
         if (!lastOutput) {
             throw new Error(
@@ -109,6 +108,7 @@ export class Node {
     }
 
     mineBlock() {
+        if (this.pendingTransactions.length === 0) return;
         let block = new Block();
         this.pendingTransactions.sort((a, b) => b.timestamp - a.timestamp);
         block.transactions.unshift(...this.pendingTransactions);

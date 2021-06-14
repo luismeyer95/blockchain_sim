@@ -1,6 +1,10 @@
 import { KeyObject } from "crypto";
 import type { Input, Output } from "./InputOutput";
-import { serializeKey, Base64SerializedKey } from "../Encryption/Encryption";
+import {
+    serializeKey,
+    Base64SerializedKey,
+    deserializeKey,
+} from "../Encryption/Encryption";
 
 interface IInitialTransaction {
     outputs: Output<KeyObject>[];
@@ -34,8 +38,13 @@ export class InitialTransaction implements IInitialTransaction {
     }
 
     deserialize(tx: string): void {
-        const { outputs, timestamp } = JSON.parse(tx) as IInitialTransaction;
-        this.outputs = outputs;
+        const { outputs, timestamp } = JSON.parse(tx);
+        this.outputs = outputs.map((output: Output<Base64SerializedKey>) => {
+            return {
+                to: deserializeKey(output.to, "public"),
+                amount: output.amount,
+            };
+        });
         this.timestamp = timestamp;
     }
 }

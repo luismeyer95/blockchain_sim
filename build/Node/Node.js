@@ -1,18 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Node = void 0;
-var Encryption_1 = require("../Encryption/Encryption");
 var utils_1 = require("../utils");
 var Block_1 = require("../Block/Block");
 var Transactions_1 = require("../Transactions/Transactions");
 var Node = /** @class */ (function () {
-    function Node(keypair) {
-        if (keypair === void 0) { keypair = Encryption_1.genKeyPair(); }
-        this.blockchain = [];
+    function Node(blockchain) {
+        this.blockchain = blockchain !== null && blockchain !== void 0 ? blockchain : [];
         this.pendingTransactions = [];
-        this.keypair = keypair;
-        if (!this.findLastTransactionOutput(keypair.publicKey))
-            this.createInitialTransaction(this.keypair, 10);
+        // if (!this.findLastTransactionOutput(keypair.publicKey))
+        //     this.createInitialTransaction(this.keypair, 10);
     }
     Node.prototype.createInitialTransaction = function (keypair, amount) {
         var initTx = new Transactions_1.InitialTransaction({
@@ -34,7 +31,7 @@ var Node = /** @class */ (function () {
         });
         return output;
     };
-    Node.prototype.signAndCreateTransaction = function (tx, privateKey) {
+    Node.prototype.createSignedTransaction = function (tx, privateKey) {
         var lastOutput = this.findLastTransactionOutput(tx.input.from);
         if (!lastOutput) {
             throw new Error("transaction error: missing last transaction output");
@@ -85,6 +82,8 @@ var Node = /** @class */ (function () {
     };
     Node.prototype.mineBlock = function () {
         var _a;
+        if (this.pendingTransactions.length === 0)
+            return;
         var block = new Block_1.Block();
         this.pendingTransactions.sort(function (a, b) { return b.timestamp - a.timestamp; });
         (_a = block.transactions).unshift.apply(_a, this.pendingTransactions);
