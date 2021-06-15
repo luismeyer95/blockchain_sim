@@ -79,7 +79,7 @@ function deserializeKeyPair(serializedKeyPair) {
 }
 exports.deserializeKeyPair = deserializeKeyPair;
 var findNonce = function (data, leadingZeroBits) {
-    if (leadingZeroBits < 0 || leadingZeroBits >= 32)
+    if (leadingZeroBits < 0 || leadingZeroBits > 32)
         throw new Error("findNonce error: invalid leadingZeroBits argument");
     var bitstr = "0".repeat(32 - leadingZeroBits).padStart(32, "1");
     var bitnum = parseInt(bitstr, 2);

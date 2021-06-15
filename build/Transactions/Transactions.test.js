@@ -38,7 +38,7 @@ describe("SignedTransaction class", function () {
             outputs: [{ to: account2.publicKey, amount: 3 }],
         });
         expect(tx.isValid()).toBeFalsy();
-        expect(tx.serialize).toThrowError();
+        expect(tx.serialize.bind(tx)).toThrowError();
         tx.sign(account2.privateKey);
         expect(tx.isValid()).toBeFalsy();
         tx.sign(account1.privateKey);
@@ -56,5 +56,32 @@ describe("SignedTransaction class", function () {
         expect(deserializedTx.isValid()).toBeTruthy();
         deserializedTx.sign(account2.privateKey);
         expect(deserializedTx.isValid()).toBeFalsy();
+    });
+    test("deserial bad object", function () {
+        var tx = new Transactions_1.SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [{ to: account2.publicKey, amount: 3 }],
+        });
+        tx.sign(account1.privateKey);
+        var serial = tx.serialize();
+        var badobj = JSON.parse(serial);
+        badobj.timestamp = undefined;
+        var badserial = JSON.stringify(badobj);
+        expect(tx.deserialize.bind(tx, badserial)).toThrowError();
+    });
+});
+describe("InitialTransaction class", function () {
+    var account1;
+    beforeEach(function () {
+        account1 = Encryption_1.genKeyPair();
+    });
+    test("serial-deserial then signing-verifying", function () {
+        var tx = new Transactions_1.InitialTransaction({
+            outputs: [{ to: account1.publicKey, amount: 36 }],
+            timestamp: Date.now(),
+        });
+        var deserializedTx = new Transactions_1.InitialTransaction(tx.serialize());
+        expect(deserializedTx.outputs).toEqual(tx.outputs);
+        expect(deserializedTx.timestamp).toEqual(tx.timestamp);
     });
 });

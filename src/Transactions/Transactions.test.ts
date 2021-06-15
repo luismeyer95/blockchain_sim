@@ -101,13 +101,13 @@ describe("InitialTransaction class", () => {
 
     test("serial-deserial then signing-verifying", () => {
         let tx = new InitialTransaction({
-            outputs: [{ to: account1.publicKey, amount: 36 }],
+            output: { to: account1.publicKey, amount: 36 },
             timestamp: Date.now(),
         });
 
         let deserializedTx = new InitialTransaction(tx.serialize());
 
-        expect(deserializedTx.outputs).toEqual(tx.outputs);
+        expect(deserializedTx.output).toEqual(tx.output);
         expect(deserializedTx.timestamp).toEqual(tx.timestamp);
     });
 });

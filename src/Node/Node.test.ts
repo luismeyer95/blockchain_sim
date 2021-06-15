@@ -39,10 +39,12 @@ describe("Node class tests", () => {
 
         expect(node.blockchain.length).toEqual(1);
         expect(node.blockchain[0].transactions.length).toEqual(1);
-        expect(node.blockchain[0].transactions[0].outputs.length).toEqual(1);
-        expect(node.blockchain[0].transactions[0].outputs[0].to).toBe(
-            account1.publicKey
+        expect(node.blockchain[0].transactions[0]).toBeInstanceOf(
+            InitialTransaction
         );
+        expect(
+            (node.blockchain[0].transactions[0] as InitialTransaction).output.to
+        ).toBe(account1.publicKey);
     });
 
     test("ltxo", () => {
@@ -54,6 +56,7 @@ describe("Node class tests", () => {
         expect(node.findLastTransactionOutput(account1.publicKey)).toEqual({
             to: account1.publicKey,
             amount: 12,
+            balance: 12,
         });
 
         const tx = new SignedTransaction({
@@ -67,6 +70,7 @@ describe("Node class tests", () => {
         expect(node.findLastTransactionOutput(account1.publicKey)).toEqual({
             to: account1.publicKey,
             amount: 9,
+            balance: 9,
         });
     });
 
@@ -79,7 +83,9 @@ describe("Node class tests", () => {
         expect(
             node.createSignedTransaction.bind(node, tx, account1.privateKey)
         ).toThrowError();
-        expect(node.validateTransactionData.bind(node, tx)).toThrowError();
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
 
         node.createInitialTransaction(account1, 10);
         node.mineBlock();
@@ -105,7 +111,9 @@ describe("Node class tests", () => {
 
         tx.sign(account1.privateKey);
 
-        expect(node.validateTransactionData.bind(node, tx)).toThrowError();
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
     });
 
     test("underspending ltxo", () => {
@@ -117,7 +125,9 @@ describe("Node class tests", () => {
         node.mineBlock();
 
         tx.sign(account1.privateKey);
-        expect(node.validateTransactionData.bind(node, tx)).toThrowError();
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
     });
 
     test("bad tx", () => {
@@ -133,7 +143,9 @@ describe("Node class tests", () => {
 
         tx.sign(account1.privateKey);
 
-        expect(node.validateTransactionData.bind(node, tx)).toThrowError();
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
     });
 
     test("multiple initial txs for a single account", () => {
@@ -151,6 +163,91 @@ describe("Node class tests", () => {
             outputs: [{ to: account2.publicKey, amount: 15 }],
         });
         tx.sign(account1.privateKey);
-        expect(node.validateTransactionData.bind(node, tx)).toThrowError();
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
+    });
+
+    test("multiple pending txs of same input address", () => {
+        const tx = new SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [{ to: account2.publicKey, amount: 3 }],
+        });
+
+        node.createInitialTransaction(account1, 10);
+        node.mineBlock();
+
+        node.createSignedTransaction(tx, account1.privateKey);
+        expect(
+            node.createSignedTransaction.bind(node, tx, account1.privateKey)
+        ).toThrowError();
+    });
+
+    test("multiple initial transactions to same address in pending txs", () => {
+        node.createInitialTransaction(account1, 10);
+
+        expect(
+            node.createInitialTransaction.bind(node, account1, 10)
+        ).toThrowError();
+    });
+
+    test("multiple references of single address in pending txs", () => {
+        node.createInitialTransaction(account1, 10);
+        node.mineBlock();
+
+        node.createInitialTransaction(account2, 10);
+
+        const tx = new SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [{ to: account2.publicKey, amount: 3 }],
+        });
+
+        expect(
+            node.createSignedTransaction.bind(node, tx, account1.privateKey)
+        ).toThrowError();
+    });
+
+    test("multiple signed transactions", () => {
+        node.createInitialTransaction(account1, 10);
+        node.mineBlock();
+
+        node.createSignedTransaction(
+            new SignedTransaction({
+                input: { from: account1.publicKey },
+                outputs: [{ to: account2.publicKey, amount: 3 }],
+            }),
+            account1.privateKey
+        );
+        node.mineBlock();
+
+        expect(
+            node.findLastTransactionOutput(account1.publicKey)!.balance
+        ).toBe(7);
+
+        node.createSignedTransaction(
+            new SignedTransaction({
+                input: { from: account1.publicKey },
+                outputs: [{ to: account2.publicKey, amount: 5 }],
+            }),
+            account1.privateKey
+        );
+        node.mineBlock();
+
+        expect(
+            node.findLastTransactionOutput(account1.publicKey)!.balance
+        ).toBe(2);
+
+        node.createSignedTransaction(
+            new SignedTransaction({
+                input: { from: account2.publicKey },
+                outputs: [{ to: account1.publicKey, amount: 1 }],
+            }),
+            account2.privateKey
+        );
+        node.mineBlock();
+
+        expect(
+            node.findLastTransactionOutput(account1.publicKey)!.balance
+        ).toBe(3);
     });
 });

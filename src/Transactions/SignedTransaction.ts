@@ -6,6 +6,7 @@ import {
     serializeKey,
     Base64SerializedKey,
     deserializeKey,
+    keyEquals,
 } from "../Encryption/Encryption";
 
 export interface ISignedTransaction {
@@ -37,6 +38,7 @@ export class SignedTransaction implements ISignedTransaction {
         let validOutputs: boolean = true;
         this.outputs.forEach((output: Output<KeyObject>) => {
             if (output.amount < 0) validOutputs = false;
+            if (output.balance && output.balance < 0) validOutputs = false;
         });
         const signable = this.makeSignableObject();
         return (
@@ -59,6 +61,7 @@ export class SignedTransaction implements ISignedTransaction {
                 return {
                     to: serializeKey(output.to),
                     amount: output.amount,
+                    balance: output.balance,
                 };
             });
         const timestamp = this.timestamp;
@@ -98,11 +101,21 @@ export class SignedTransaction implements ISignedTransaction {
             return {
                 to: deserializeKey(output.to, "public"),
                 amount: output.amount,
+                balance: output.balance,
             };
         });
         this.signature = Buffer.from(signature, "base64");
         if (!timestamp)
             throw new Error("transaction deserialize error: no timestamp");
         this.timestamp = timestamp;
+    }
+
+    containsAddress(key: KeyObject): boolean {
+        if (keyEquals(key, this.input.from)) return true;
+        let ret: boolean = false;
+        this.outputs.forEach((output) => {
+            if (keyEquals(key, output.to)) ret = true;
+        });
+        return ret;
     }
 }

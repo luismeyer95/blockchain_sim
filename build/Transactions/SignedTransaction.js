@@ -33,8 +33,14 @@ var SignedTransaction = /** @class */ (function () {
     SignedTransaction.prototype.isValid = function () {
         if (!this.signature)
             return false;
+        var validOutputs = true;
+        this.outputs.forEach(function (output) {
+            if (output.amount < 0)
+                validOutputs = false;
+        });
         var signable = this.makeSignableObject();
-        return Encryption_1.verify(Buffer.from(JSON.stringify(signable)), this.input.from, this.signature);
+        return (validOutputs &&
+            Encryption_1.verify(Buffer.from(JSON.stringify(signable)), this.input.from, this.signature));
     };
     SignedTransaction.prototype.makeSignableObject = function () {
         var input = {
@@ -60,15 +66,16 @@ var SignedTransaction = /** @class */ (function () {
         this.signature = Encryption_1.sign(Buffer.from(JSON.stringify(this.makeSignableObject())), privateKey);
     };
     SignedTransaction.prototype.serialize = function () {
-        var _a;
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        if (!this.isValid())
-            throw new Error("transaction error: trying to serialize invalid transaction");
+        if (!this.isValid()) {
+            var strerror = "transaction error: trying to serialize invalid transaction";
+            throw new Error(strerror);
+        }
         var signable = this.makeSignableObject();
-        var signature = (_a = this.signature) === null || _a === void 0 ? void 0 : _a.toString("base64");
+        var signature = this.signature.toString("base64");
         return JSON.stringify.apply(JSON, __spreadArray([__assign(__assign({}, signable), { signature: signature })], args));
     };
     SignedTransaction.prototype.deserialize = function (tx) {

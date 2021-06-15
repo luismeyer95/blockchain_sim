@@ -47,18 +47,14 @@ export function deserializeKey(
     key: Base64SerializedKey,
     type: "public" | "private"
 ): KeyObject {
-    // const keyCreationParams = {
-    //     key: Buffer.from(key, "base64"),
-    //     type: "pkcs1",
-    //     format: "pem",
-    // };
-    // return type === "public"
-    //     ? crypto.createPublicKey(keyCreationParams as crypto.PublicKeyInput)
-    //     : crypto.createPrivateKey(keyCreationParams as crypto.PrivateKeyInput);
-
-    return type === "public"
-        ? crypto.createPublicKey(key)
-        : crypto.createPrivateKey(key);
+    let dskey =
+        type === "public"
+            ? crypto.createPublicKey(key)
+            : crypto.createPrivateKey(key);
+    // the following operation defines the asymmetricKeyType
+    // and restores the og state for some reason
+    dskey.asymmetricKeyType;
+    return dskey;
 }
 
 export function serializeKey(key: KeyObject): Base64SerializedKey {
@@ -86,6 +82,10 @@ export function deserializeKeyPair(
         publicKey: deserializeKey(serializedKeyPair.publicKey, "public"),
         privateKey: deserializeKey(serializedKeyPair.privateKey, "private"),
     };
+}
+
+export function keyEquals(a: KeyObject, b: KeyObject) {
+    return serializeKey(a) === serializeKey(b);
 }
 
 type ExcludeHashNonce<T> = Omit<T, "hash" | "nonce"> extends T

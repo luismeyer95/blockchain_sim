@@ -35,8 +35,18 @@ var InitialTransaction = /** @class */ (function () {
     };
     InitialTransaction.prototype.deserialize = function (tx) {
         var _a = JSON.parse(tx), outputs = _a.outputs, timestamp = _a.timestamp;
-        this.outputs = outputs;
+        this.outputs = outputs.map(function (output) {
+            return {
+                to: Encryption_1.deserializeKey(output.to, "public"),
+                amount: output.amount,
+            };
+        });
         this.timestamp = timestamp;
+        // the following operation defines the asymmetricKeyType
+        // and restores the og state for some reason
+        this.outputs.forEach(function (output) {
+            output.to.asymmetricKeyType;
+        });
     };
     return InitialTransaction;
 }());

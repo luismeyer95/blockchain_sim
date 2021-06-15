@@ -10,23 +10,29 @@ describe("Node class tests", function () {
     beforeEach(function () {
         account1 = Encryption_1.genKeyPair();
         account2 = Encryption_1.genKeyPair();
+        node = new Node_1.Node();
     });
     test("empty mining", function () {
-        node = new Node_1.Node();
         node.mineBlock();
         expect(node.blockchain.length).toEqual(0);
     });
+    test("passing a blockchain to constructor", function () {
+        node.createInitialTransaction(account1, 10);
+        node.mineBlock();
+        var other = new Node_1.Node(node.blockchain);
+        expect(node.blockchain).toEqual(other.blockchain);
+    });
     test("initial blockchain tx", function () {
-        node = new Node_1.Node();
         node.createInitialTransaction(account1, 10);
         node.mineBlock();
         expect(node.blockchain.length).toEqual(1);
         expect(node.blockchain[0].transactions.length).toEqual(1);
         expect(node.blockchain[0].transactions[0].outputs.length).toEqual(1);
-        expect(node.blockchain[0].transactions[0].outputs[0].to).toBe(account1.publicKey);
+        expect(node.blockchain[0].transactions[0].outputs[0].to).toBe(
+            account1.publicKey
+        );
     });
     test("ltxo", function () {
-        node = new Node_1.Node();
         expect(node.findLastTransactionOutput(account1.publicKey)).toBeNull();
         node.createInitialTransaction(account1, 12);
         node.mineBlock();
@@ -46,17 +52,91 @@ describe("Node class tests", function () {
         });
     });
     test("signed transaction", function () {
-        node = new Node_1.Node();
         var tx = new Transactions_1.SignedTransaction({
             input: { from: account1.publicKey },
             outputs: [{ to: account2.publicKey, amount: 3 }],
         });
-        expect(node.createSignedTransaction.bind(node, tx, account1.privateKey)).toThrowError();
+        expect(
+            node.createSignedTransaction.bind(node, tx, account1.privateKey)
+        ).toThrowError();
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
         node.createInitialTransaction(account1, 10);
         node.mineBlock();
-        expect(node.createSignedTransaction.bind(node, tx, account2.privateKey)).toThrowError();
-        // node.createSignedTransaction(tx, account1.privateKey);
-        // node.mineBlock();
-        // node.printBlockchain();
+        expect(
+            node.createSignedTransaction.bind(node, tx, account2.privateKey)
+        ).toThrowError();
+        node.createSignedTransaction(tx, account1.privateKey);
+        node.mineBlock();
+    });
+    test("overspending ltxo", function () {
+        var tx = new Transactions_1.SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [{ to: account2.publicKey, amount: 15 }],
+        });
+        node.createInitialTransaction(account1, 12);
+        node.mineBlock();
+        expect(node.findLastTransactionOutput(tx.input.from).amount).toEqual(
+            12
+        );
+        tx.sign(account1.privateKey);
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
+    });
+    test("underspending ltxo", function () {
+        var tx = new Transactions_1.SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [{ to: account2.publicKey, amount: 12 }],
+        });
+        node.createInitialTransaction(account1, 15);
+        node.mineBlock();
+        tx.sign(account1.privateKey);
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
+    });
+    test("bad tx", function () {
+        var tx = new Transactions_1.SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [
+                { to: account2.publicKey, amount: 15 },
+                { to: account1.publicKey, amount: -3 },
+            ],
+        });
+        node.createInitialTransaction(account1, 12);
+        node.mineBlock();
+        tx.sign(account1.privateKey);
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
+    });
+    test("multiple initial txs for a single account", function () {
+        node.createInitialTransaction(account1, 12);
+        node.mineBlock();
+        expect(
+            node.createInitialTransaction.bind(node, account1, 12)
+        ).toThrowError();
+    });
+    test("spending non-existent ltxo", function () {
+        var tx = new Transactions_1.SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [{ to: account2.publicKey, amount: 15 }],
+        });
+        tx.sign(account1.privateKey);
+        expect(
+            node.validateTransactionAgainstBlockchain.bind(node, tx)
+        ).toThrowError();
+    });
+    test("multiple signed transactions", function () {
+        var tx = new Transactions_1.SignedTransaction({
+            input: { from: account1.publicKey },
+            outputs: [{ to: account2.publicKey, amount: 3 }],
+        });
+        node.createInitialTransaction(account1, 10);
+        node.mineBlock();
+        node.createSignedTransaction(tx, account1.privateKey);
+        node.mineBlock();
     });
 });

@@ -13,20 +13,8 @@ import {
 import readline from "readline";
 import { exit } from "process";
 
-///
-// const account1 = genKeyPair();
-// const account2 = genKeyPair();
-// const node = new Node(account1);
+// this.pendingTransactions.sort((a, b) => b.timestamp - a.timestamp);
 
-// node.mineBlock();
+const arr = [0, 1, 94, 3, 2, 7, 12, 32, 76];
 
-// const tx = new SignedTransaction({
-//     input: { from: account1.publicKey },
-//     outputs: [{ to: account2.publicKey, amount: 3 }],
-// });
-
-// node.createSignedTransaction(tx, account1.privateKey);
-
-// node.mineBlock();
-
-// node.printBlockchain();
+console.log(arr.sort((a, b) => b - a));
