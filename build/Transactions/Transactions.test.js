@@ -77,11 +77,11 @@ describe("InitialTransaction class", function () {
     });
     test("serial-deserial then signing-verifying", function () {
         var tx = new Transactions_1.InitialTransaction({
-            outputs: [{ to: account1.publicKey, amount: 36 }],
+            output: { to: account1.publicKey, amount: 36 },
             timestamp: Date.now(),
         });
         var deserializedTx = new Transactions_1.InitialTransaction(tx.serialize());
-        expect(deserializedTx.outputs).toEqual(tx.outputs);
+        expect(deserializedTx.output).toEqual(tx.output);
         expect(deserializedTx.timestamp).toEqual(tx.timestamp);
     });
 });

@@ -65,6 +65,7 @@ export class Node {
     }
 
     validateTransaction(tx: InitialTransaction | SignedTransaction) {
+        if (tx instanceof SignedTransaction) this.validateTransactionData(tx);
         this.validateTransactionAgainstBlockchain(tx);
         this.validateTxAddressUnicityInPendingTxs(tx);
     }
@@ -94,7 +95,6 @@ export class Node {
         tx: SignedTransaction | InitialTransaction
     ): void {
         if (tx instanceof SignedTransaction) {
-            this.validateTransactionSignature(tx);
             const lastOutput = this.findLastTransactionOutput(tx.input.from);
             if (lastOutput && lastOutput.balance) {
                 if (tx.getTotalAmount() > lastOutput.balance)
@@ -115,15 +115,14 @@ export class Node {
         }
     }
 
-    validateTransactionSignature(tx: SignedTransaction): void {
+    validateTransactionData(tx: SignedTransaction): void {
         if (!tx.isValid())
             throw new Error(
-                "transaction creation error: invalid transaction signature"
+                "transaction creation error: invalid transaction data"
             );
     }
 
     findLastTransactionOutput(publicKey: KeyObject): Output<KeyObject> | null {
-        // console.log(this.blockchain);
         if (this.blockchain.length === 0) return null;
         const output: Output<KeyObject> | undefined = dig(
             this.blockchain,

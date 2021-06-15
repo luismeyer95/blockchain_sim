@@ -1,3 +1,4 @@
+import { notEqual } from "assert";
 import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import { genKeyPair } from "../Encryption/Encryption";
 import {
@@ -141,10 +142,8 @@ describe("Node class tests", () => {
         node.createInitialTransaction(account1, 12);
         node.mineBlock();
 
-        tx.sign(account1.privateKey);
-
         expect(
-            node.validateTransactionAgainstBlockchain.bind(node, tx)
+            node.createSignedTransaction.bind(node, tx, account1.privateKey)
         ).toThrowError();
     });
 

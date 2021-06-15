@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.findNonce = exports.deserializeKeyPair = exports.serializeKeyPair = exports.serializeKey = exports.deserializeKey = exports.hash = exports.genKeyPair = exports.verify = exports.sign = void 0;
+exports.findNonce = exports.keyEquals = exports.deserializeKeyPair = exports.serializeKeyPair = exports.serializeKey = exports.deserializeKey = exports.hash = exports.genKeyPair = exports.verify = exports.sign = void 0;
 var crypto_1 = __importDefault(require("crypto"));
 var sign = function (data, privateKey) {
     return crypto_1.default.sign("sha256", data, {
@@ -42,17 +42,13 @@ var hash = function (data) {
 };
 exports.hash = hash;
 function deserializeKey(key, type) {
-    // const keyCreationParams = {
-    //     key: Buffer.from(key, "base64"),
-    //     type: "pkcs1",
-    //     format: "pem",
-    // };
-    // return type === "public"
-    //     ? crypto.createPublicKey(keyCreationParams as crypto.PublicKeyInput)
-    //     : crypto.createPrivateKey(keyCreationParams as crypto.PrivateKeyInput);
-    return type === "public"
+    var dskey = type === "public"
         ? crypto_1.default.createPublicKey(key)
         : crypto_1.default.createPrivateKey(key);
+    // the following operation defines the asymmetricKeyType
+    // and restores the og state for some reason
+    dskey.asymmetricKeyType;
+    return dskey;
 }
 exports.deserializeKey = deserializeKey;
 function serializeKey(key) {
@@ -78,6 +74,10 @@ function deserializeKeyPair(serializedKeyPair) {
     };
 }
 exports.deserializeKeyPair = deserializeKeyPair;
+function keyEquals(a, b) {
+    return serializeKey(a) === serializeKey(b);
+}
+exports.keyEquals = keyEquals;
 var findNonce = function (data, leadingZeroBits) {
     if (leadingZeroBits < 0 || leadingZeroBits > 32)
         throw new Error("findNonce error: invalid leadingZeroBits argument");

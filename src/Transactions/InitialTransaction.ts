@@ -37,7 +37,6 @@ export class InitialTransaction implements IInitialTransaction {
 
     deserialize(tx: string): void {
         const { output, timestamp } = JSON.parse(tx);
-        // console.log(output.to);
         this.output = {
             to: deserializeKey(output.to, "public"),
             amount: output.amount,

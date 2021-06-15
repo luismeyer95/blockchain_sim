@@ -13,7 +13,7 @@ var InitialTransaction = /** @class */ (function () {
             this.deserialize(tx);
         }
         else {
-            this.outputs = tx.outputs;
+            this.output = tx.output;
             this.timestamp = tx.timestamp;
         }
     }
@@ -22,31 +22,26 @@ var InitialTransaction = /** @class */ (function () {
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        var outputs = this.outputs
-            .slice()
-            .map(function (output) {
-            return {
-                to: Encryption_1.serializeKey(output.to),
-                amount: output.amount,
-            };
-        });
+        var output = {
+            to: Encryption_1.serializeKey(this.output.to),
+            amount: this.output.amount,
+            balance: this.output.balance,
+        };
         var timestamp = this.timestamp;
-        return JSON.stringify.apply(JSON, __spreadArray([{ outputs: outputs, timestamp: timestamp }], args));
+        return JSON.stringify.apply(JSON, __spreadArray([{ output: output, timestamp: timestamp }], args));
     };
     InitialTransaction.prototype.deserialize = function (tx) {
-        var _a = JSON.parse(tx), outputs = _a.outputs, timestamp = _a.timestamp;
-        this.outputs = outputs.map(function (output) {
-            return {
-                to: Encryption_1.deserializeKey(output.to, "public"),
-                amount: output.amount,
-            };
-        });
+        var _a = JSON.parse(tx), output = _a.output, timestamp = _a.timestamp;
+        this.output = {
+            to: Encryption_1.deserializeKey(output.to, "public"),
+            amount: output.amount,
+            balance: output.balance,
+        };
         this.timestamp = timestamp;
-        // the following operation defines the asymmetricKeyType
-        // and restores the og state for some reason
-        this.outputs.forEach(function (output) {
-            output.to.asymmetricKeyType;
-        });
+    };
+    InitialTransaction.prototype.containsAddress = function (key) {
+        if (Encryption_1.keyEquals(key, this.output.to))
+            return true;
     };
     return InitialTransaction;
 }());

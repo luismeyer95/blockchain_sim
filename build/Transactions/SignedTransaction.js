@@ -37,6 +37,8 @@ var SignedTransaction = /** @class */ (function () {
         this.outputs.forEach(function (output) {
             if (output.amount < 0)
                 validOutputs = false;
+            if (output.balance && output.balance < 0)
+                validOutputs = false;
         });
         var signable = this.makeSignableObject();
         return (validOutputs &&
@@ -52,6 +54,7 @@ var SignedTransaction = /** @class */ (function () {
             return {
                 to: Encryption_1.serializeKey(output.to),
                 amount: output.amount,
+                balance: output.balance,
             };
         });
         var timestamp = this.timestamp;
@@ -85,12 +88,23 @@ var SignedTransaction = /** @class */ (function () {
             return {
                 to: Encryption_1.deserializeKey(output.to, "public"),
                 amount: output.amount,
+                balance: output.balance,
             };
         });
         this.signature = Buffer.from(signature, "base64");
         if (!timestamp)
             throw new Error("transaction deserialize error: no timestamp");
         this.timestamp = timestamp;
+    };
+    SignedTransaction.prototype.containsAddress = function (key) {
+        if (Encryption_1.keyEquals(key, this.input.from))
+            return true;
+        var ret = false;
+        this.outputs.forEach(function (output) {
+            if (Encryption_1.keyEquals(key, output.to))
+                ret = true;
+        });
+        return ret;
     };
     return SignedTransaction;
 }());
