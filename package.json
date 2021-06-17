@@ -21,10 +21,12 @@
     },
     "dependencies": {
         "@types/lodash": "^4.14.170",
-        "dat-swarm-defaults": "^1.0.2",
-        "discovery-swarm": "^6.1.0",
-        "get-port": "^5.1.1",
-        "lodash": "^4.17.21"
+        "duplex-json-stream": "^1.0.1",
+        "fully-connected-topology": "^1.1.1",
+        "hash-to-port": "^1.2.0",
+        "lodash": "^4.17.21",
+        "register-multicast-dns": "^1.1.0",
+        "stream-set": "^1.1.0"
     },
     "jest": {
         "preset": "ts-jest",

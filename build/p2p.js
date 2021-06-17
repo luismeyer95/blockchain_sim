@@ -61,7 +61,8 @@ function log() {
         args[_i] = arguments[_i];
     }
     if (rl) {
-        // rl.clearLine();
+        // @ts-ignore
+        rl.clearLine();
         rl.close();
         rl = undefined;
     }

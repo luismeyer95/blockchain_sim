@@ -1,3 +1,5 @@
+import net from "net";
+
 export const dig = <T>(
     arr: Array<T>,
     cb: Parameters<typeof Array.prototype.find>[0]
