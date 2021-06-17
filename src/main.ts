@@ -13,8 +13,8 @@ import {
 import readline from "readline";
 import { exit } from "process";
 
-// this.pendingTransactions.sort((a, b) => b.timestamp - a.timestamp);
+// import SwarmNet from "./NodeNet/SwarmNet";
+import ChatP2P from "./Network/ChatP2P";
 
-const arr = [0, 1, 94, 3, 2, 7, 12, 32, 76];
-
-console.log(arr.sort((a, b) => b - a));
+const swarm = new ChatP2P();
+process.stdin.on("data", swarm.getDataHook());

@@ -24,13 +24,14 @@ var network_address_1 = __importDefault(require("network-address"));
 var length_prefixed_message_1 = __importDefault(require("length-prefixed-message"));
 var Topology = /** @class */ (function (_super) {
     __extends(Topology, _super);
-    function Topology(me, peers) {
+    function Topology(me, peers, errorCallback) {
         var _this = _super.call(this) || this;
         if (/^\d+$/.test(me))
             me = network_address_1.default() + ":" + me;
         _this.me = me || "";
         _this.peers = {};
         _this.server = null;
+        _this.errorCallback = errorCallback;
         if (_this.me)
             _this.listen(Number(me.split(":")[1]));
         // events.EventEmitter.call(this);
@@ -43,6 +44,8 @@ var Topology = /** @class */ (function (_super) {
         this.server = net_1.default.createServer(function (socket) {
             _this.onconnection(socket);
         });
+        if (this.errorCallback)
+            this.server.on("error", this.errorCallback);
         this.server.listen(port);
     };
     Topology.prototype.add = function (addr) {

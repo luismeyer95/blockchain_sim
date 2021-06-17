@@ -7,7 +7,6 @@ var stream_set_1 = __importDefault(require("stream-set"));
 var Sockets_1 = __importDefault(require("./Sockets"));
 var register_multicast_dns_1 = __importDefault(require("register-multicast-dns"));
 var hash_to_port_1 = __importDefault(require("hash-to-port"));
-// net.connect(9000, "localhost", () => {});
 function toAddress(name) {
     return name + ".local:" + hash_to_port_1.default(name);
 }

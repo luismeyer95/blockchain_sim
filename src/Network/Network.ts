@@ -4,8 +4,6 @@ import Topology from "./Sockets";
 import register from "register-multicast-dns";
 import toPort from "hash-to-port";
 
-// net.connect(9000, "localhost", () => {});
-
 function toAddress(name: string) {
     return name + ".local:" + toPort(name);
 }

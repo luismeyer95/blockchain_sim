@@ -1,5 +1,17 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-// this.pendingTransactions.sort((a, b) => b.timestamp - a.timestamp);
-var arr = [0, 1, 94, 3, 2, 7, 12, 32, 76];
-console.log(arr.sort(function (a, b) { return b - a; }));
+var SwarmNet_1 = __importDefault(require("./NodeNet/SwarmNet"));
+var swarm = new SwarmNet_1.default();
+process.stdin.on("data", function (data) {
+    var message = JSON.stringify({
+        type: "MESSAGE",
+        payload: swarm.id + "> " + data.toString(),
+    });
+    swarm.streams.forEach(function (stream) {
+        stream.write(message);
+    });
+    process.stdout.write(swarm.id + "> ");
+});

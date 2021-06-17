@@ -23,7 +23,13 @@ class Topology extends events.EventEmitter {
     public peers: { [key: string]: PeerInfo }; // HostPortString => PeerInfo
     public server?: Nullable<net.Server>;
 
-    constructor(me: HostPortString, peers: HostPortString[]) {
+    public errorCallback?: (err: Error) => void;
+
+    constructor(
+        me: HostPortString,
+        peers: HostPortString[],
+        errorCallback?: (err: Error) => void
+    ) {
         super();
 
         if (/^\d+$/.test(me)) me = networkAddress() + ":" + me;
@@ -31,6 +37,7 @@ class Topology extends events.EventEmitter {
         this.me = me || "";
         this.peers = {};
         this.server = null;
+        this.errorCallback = errorCallback;
 
         if (this.me) this.listen(Number(me.split(":")[1]));
 
@@ -43,6 +50,7 @@ class Topology extends events.EventEmitter {
         this.server = net.createServer((socket: net.Socket) => {
             this.onconnection(socket);
         });
+        if (this.errorCallback) this.server.on("error", this.errorCallback);
 
         this.server.listen(port);
     }
@@ -103,7 +111,7 @@ class Topology extends events.EventEmitter {
     }
 
     onconnection(socket: net.Socket) {
-        console.log("onconnection emitted");
+        // console.log("onconnection emitted");
         // set socket to destroy on error and on a 15s timeout
         this.errorHandle(socket);
         lpmessage.read(socket, (from: any) => {
