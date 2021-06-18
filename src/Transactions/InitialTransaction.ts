@@ -1,20 +1,33 @@
 import { KeyObject } from "crypto";
-import type { Input, Output } from "./InputOutput";
+import { Input, isInput, Output, isOutput } from "./InputOutput";
 import {
     serializeKey,
     Base64SerializedKey,
     deserializeKey,
     keyEquals,
 } from "../Encryption/Encryption";
+import ISerializable from "src/Serializable/ISerializable";
 
 interface IInitialTransaction {
     output: Output<KeyObject>;
     timestamp: number;
 }
 
-export class InitialTransaction implements IInitialTransaction {
+export class InitialTransaction implements IInitialTransaction, ISerializable {
     public output: Output<KeyObject>;
     public timestamp: number;
+
+    static isInitialTransaction(obj: any): obj is InitialTransaction {
+        try {
+            obj = new InitialTransaction(obj);
+            return (
+                isOutput<KeyObject>(obj.output) &&
+                typeof obj.timestamp === "number"
+            );
+        } catch {
+            return false;
+        }
+    }
 
     constructor(tx: IInitialTransaction | string) {
         if (typeof tx === "string") {

@@ -1,5 +1,5 @@
 import { KeyObject, KeyPairKeyObjectResult } from "crypto";
-import type { Input, Output } from "./InputOutput";
+import { Input, isInput, Output, isOutput } from "./InputOutput";
 import {
     sign,
     verify,
@@ -8,6 +8,8 @@ import {
     deserializeKey,
     keyEquals,
 } from "../Encryption/Encryption";
+import { z } from "zod";
+import ISerializable from "src/Serializable/ISerializable";
 
 export interface ISignedTransaction {
     input: Input<KeyObject>;
@@ -16,11 +18,34 @@ export interface ISignedTransaction {
     timestamp?: number;
 }
 
-export class SignedTransaction implements ISignedTransaction {
+export class SignedTransaction implements ISignedTransaction, ISerializable {
     public input: Input<KeyObject>;
     public outputs: Output<KeyObject>[];
     public signature?: Buffer;
     public timestamp: number;
+
+    static isSignedTransaction(json: string): boolean {
+        try {
+            let obj = new SignedTransaction(json);
+            if (!Array.isArray(obj.outputs)) return false;
+            let ret = true;
+            obj.outputs.forEach((output: any) => {
+                if (!isOutput<KeyObject>(output)) ret = false;
+            });
+            // console.log(ret);
+            // console.log(typeof obj.timestamp === "number");
+            // console.log(
+            //     Buffer.isBuffer(obj.signature) || obj.signature === undefined
+            // );
+            return (
+                ret &&
+                typeof obj.timestamp === "number" &&
+                (Buffer.isBuffer(obj.signature) || obj.signature === undefined)
+            );
+        } catch {
+            return false;
+        }
+    }
 
     constructor(tx: ISignedTransaction | string) {
         if (typeof tx === "string") {

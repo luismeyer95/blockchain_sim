@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">80.95% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>55/55</span>
+                <span class='fraction'>51/63</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">60% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>3/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">80.95% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>55/55</span>
+                <span class='fraction'>51/63</span>
             </div>
         
             
@@ -112,7 +112,15 @@
 <a name='L53'></a><a href='#L53'>53</a>
 <a name='L54'></a><a href='#L54'>54</a>
 <a name='L55'></a><a href='#L55'>55</a>
-<a name='L56'></a><a href='#L56'>56</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -128,6 +136,19 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -159,68 +180,71 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { KeyObject } from "crypto";
-import type { Input, Output } from "./InputOutput";
+import { Input, isInput, Output, isOutput } from "./InputOutput";
 import {
     serializeKey,
     Base64SerializedKey,
     deserializeKey,
+    keyEquals,
 } from "../Encryption/Encryption";
 &nbsp;
 interface IInitialTransaction {
-    outputs: Output&lt;KeyObject&gt;[];
+    output: Output&lt;KeyObject&gt;;
     timestamp: number;
 }
 &nbsp;
 export class InitialTransaction implements IInitialTransaction {
-    public outputs: Output&lt;KeyObject&gt;[];
+    public output: Output&lt;KeyObject&gt;;
     public timestamp: number;
+&nbsp;
+<span class="fstat-no" title="function not covered" >    static isInitialTransaction(obj: any): obj is InitialTransaction {</span>
+<span class="cstat-no" title="statement not covered" >        try {</span>
+<span class="cstat-no" title="statement not covered" >            obj = new InitialTransaction(obj);</span>
+<span class="cstat-no" title="statement not covered" >            return (</span>
+<span class="cstat-no" title="statement not covered" >                isOutput&lt;KeyObject&gt;(obj.output) &amp;&amp;</span>
+<span class="cstat-no" title="statement not covered" >                typeof obj.timestamp === "number"</span>
+<span class="cstat-no" title="statement not covered" >            );</span>
+<span class="cstat-no" title="statement not covered" >        } catch {</span>
+<span class="cstat-no" title="statement not covered" >            return false;</span>
+<span class="cstat-no" title="statement not covered" >        }</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
 &nbsp;
     constructor(tx: IInitialTransaction | string) {
         if (typeof tx === "string") {
             this.deserialize(tx);
         } else {
-            this.outputs = tx.outputs;
+            this.output = tx.output;
             this.timestamp = tx.timestamp;
         }
     }
 &nbsp;
     serialize(...args: any): string {
-        const outputs: Output&lt;Base64SerializedKey&gt;[] = this.outputs
-            .slice()
-            .map((output: Output&lt;KeyObject&gt;) =&gt; {
-                return {
-                    to: serializeKey(output.to),
-                    amount: output.amount,
-                } as Output&lt;Base64SerializedKey&gt;;
-            });
+        const output: Output&lt;Base64SerializedKey&gt; = {
+            to: serializeKey(this.output.to),
+            amount: this.output.amount,
+            balance: this.output.balance,
+        };
         const timestamp = this.timestamp;
-        return JSON.stringify({ outputs, timestamp }, ...args);
+        return JSON.stringify({ output, timestamp }, ...args);
     }
 &nbsp;
     deserialize(tx: string): void {
-        const { outputs, timestamp } = JSON.parse(tx);
-        this.outputs = outputs.map((output: Output&lt;Base64SerializedKey&gt;) =&gt; {
-            return {
-                to: deserializeKey(output.to, "public"),
-                amount: output.amount,
-            };
-        });
+        const { output, timestamp } = JSON.parse(tx);
+        this.output = {
+            to: deserializeKey(output.to, "public"),
+            amount: output.amount,
+            balance: output.balance,
+        };
         this.timestamp = timestamp;
-        // the following operation defines the asymmetricKeyType
-        // and restores the og state for some reason
-        // this.outputs.forEach((output) =&gt; {
-        //     output.to.asymmetricKeyType;
-        // });
     }
+&nbsp;
+<span class="fstat-no" title="function not covered" >    containsAddress(key: KeyObject) {</span>
+<span class="cstat-no" title="statement not covered" >        if (keyEquals(key, this.output.to)) return true;</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -229,7 +253,7 @@ export class InitialTransaction implements IInitialTransaction {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank">istanbul</a>
-                at Tue Jun 15 2021 12:11:59 GMT+0200 (Central European Summer Time)
+                at Fri Jun 18 2021 14:20:32 GMT+0200 (Central European Summer Time)
             </div>
         </div>
         <script src="../prettify.js"></script>

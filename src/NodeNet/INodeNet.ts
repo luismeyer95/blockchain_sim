@@ -4,7 +4,5 @@ import { InitialTransaction } from "src/Transactions/InitialTransaction";
 import { SignedTransaction } from "src/Transactions/SignedTransaction";
 
 export default interface INodeNet extends EventEmitter {
-    broadcast(
-        message: Block | Block[] | InitialTransaction | SignedTransaction
-    ): void;
+    broadcast(message: unknown): void;
 }

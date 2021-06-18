@@ -1,7 +1,7 @@
 import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import { genKeyPair, serializeKey } from "../Encryption/Encryption";
 import { dig } from "../utils";
-import _, { has, initial, last } from "lodash";
+// import _, { has, initial, last } from "lodash";
 
 import { Block } from "../Block/Block";
 import {
@@ -11,14 +11,48 @@ import {
     Output,
 } from "../Transactions/Transactions";
 
+import INodeNet from "src/NodeNet/INodeNet";
+// import SwarmNet from "src/NodeNet/SwarmNet";
+import INodeProtocol from "src/NodeProtocol/INodeProtocol";
+import NodeProtocol from "src/NodeProtocol/NodeProtocol";
+
 export class Node {
     public blockchain: Block[];
     public pendingTransactions: Array<SignedTransaction | InitialTransaction>;
-    public keypair: KeyPairKeyObjectResult;
+    // public keypair: KeyPairKeyObjectResult;
 
-    constructor(blockchain?: Block[]) {
+    public protocol: INodeProtocol;
+
+    constructor(
+        blockchain?: Block[],
+        protocol: INodeProtocol = new NodeProtocol()
+    ) {
         this.blockchain = blockchain ?? [];
         this.pendingTransactions = [];
+
+        this.protocol = protocol;
+
+        this.protocol.on("initial_tx", (tx: InitialTransaction) => {
+            try {
+                console.log("[received initial_tx]");
+                this.collectTransaction(tx);
+            } catch (err) {
+                console.error(
+                    "caught invalid initial transaction from peer, ignored"
+                );
+            }
+        });
+
+        this.protocol.on("signed_tx", (tx: SignedTransaction) => {
+            try {
+                console.log("[received signed_tx]");
+                this.collectTransaction(tx);
+            } catch (err) {
+                console.error(
+                    "caught invalid signed transaction from peer, ignored"
+                );
+            }
+        });
     }
 
     createInitialTransaction(keypair: KeyPairKeyObjectResult, amount: number) {
@@ -28,6 +62,7 @@ export class Node {
         });
         this.collectTransaction(initTx);
         // broadcast tx here
+        this.protocol.process(initTx);
     }
 
     createSignedTransaction(tx: SignedTransaction, privateKey: KeyObject) {
@@ -56,6 +91,7 @@ export class Node {
         txProcessed.sign(privateKey);
         this.collectTransaction(txProcessed);
         // broadcast tx here
+        this.protocol.process(txProcessed);
     }
 
     collectTransaction(tx: InitialTransaction | SignedTransaction) {

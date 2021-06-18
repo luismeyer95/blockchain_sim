@@ -11,6 +11,10 @@ import register from "register-multicast-dns";
 import toPort from "hash-to-port";
 
 import { v4 as generateUUID } from "uuid";
+import INodeProtocol from "src/NodeProtocol/INodeProtocol";
+import NodeProtocol from "src/NodeProtocol/NodeProtocol";
+
+import { z } from "zod";
 
 function IdToAddress(name: string) {
     return name + ".local:" + toPort(name);
@@ -20,12 +24,20 @@ function addressToId(addr: string) {
     return addr.substr(0, addr.indexOf("."));
 }
 
-const log = (data: string): void => {
-    process.stdout.clearLine(-1); // clear current text
-    process.stdout.cursorTo(0);
-    process.stdout.write(data);
-    // process.stdout.write(`${id}> `);
-};
+const NetworkMessage = z.object({
+    peer: z.object({
+        type: z.string(),
+        table: z.string().array(),
+    }),
+    // protocol: z.any()
+});
+
+const Payload = z.object({
+    payload: z.any().refine((p) => p !== undefined),
+});
+
+type NetworkMessage = z.infer<typeof NetworkMessage>;
+type Payload = z.infer<typeof Payload>;
 
 export default class SwarmNet extends EventEmitter implements INodeNet {
     public id: string;
@@ -34,7 +46,7 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
     public streams: StreamSet;
     private defaultId: string = "default";
 
-    constructor() {
+    constructor(protocol?: INodeProtocol) {
         super();
         this.streams = new StreamSet();
         const fallback = () => {
@@ -44,8 +56,8 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
     }
 
     log(data: string): void {
-        // process.stdout.clearLine(-1); // clear current text
-        // process.stdout.cursorTo(0);
+        process.stdout.clearLine(-1); // clear current text
+        process.stdout.cursorTo(0);
         process.stdout.write(data);
     }
 
@@ -70,6 +82,8 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
     }
 
     private onConnection(newPeer: Socket, peerAddress: string) {
+        this.log(`[${peerAddress} joined]\n`);
+
         this.emit("connection");
         // add comm socket to set
         this.streams.add(newPeer);
@@ -78,7 +92,43 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
         if (!this.peerIds.find((id) => id === peerId))
             this.peerIds.push(peerId);
         // send peer table
-        newPeer.on("data", (data) => {
+        const peerTableMsg: NetworkMessage = {
+            peer: {
+                type: "PEER_TABLE",
+                table: this.peerIds,
+            },
+        };
+        newPeer.write(JSON.stringify(peerTableMsg));
+        newPeer.on("data", (data: Buffer) => {
+            this.log("[received data from peer]\n");
+            const strdata: string = data.toString();
+            const obj: unknown = JSON.parse(strdata);
+
+            let netValidation = NetworkMessage.safeParse(obj);
+
+            if (netValidation.success) {
+                if (netValidation.data.peer.type === "PEER_TABLE") {
+                    // console.log("is unknown?");
+                    this.log(`[received ${peerAddress}'s peer table]\n`);
+                    const table = netValidation.data.peer.table;
+                    // only keep received table entries that are not in my table and
+                    // that don't reference myself
+                    const unknownPeers = table.filter(
+                        (peerId: string) =>
+                            !this.peerIds.includes(peerId) && peerId !== this.id
+                    );
+                    unknownPeers.forEach((peerId: string) => {
+                        this.peerIds.push(peerId);
+                        this.log(`[adding ${IdToAddress(peerId)} to swarm]\n`);
+                        this.swarm.add(IdToAddress(peerId));
+                    });
+                }
+            }
+
+            let payloadValidation = Payload.safeParse(obj);
+            if (payloadValidation.success) {
+                this.emit("payload", payloadValidation.data.payload);
+            }
             // only keep received table entries that are not in my table and
             // that don't reference myself
         });
@@ -89,27 +139,11 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
         });
     }
 
-    broadcast(
-        message: Block | Block[] | InitialTransaction | SignedTransaction
-    ): void {
-        switch (message.constructor) {
-            case Block:
-                this.broadcastBlock(message as Block);
-                break;
-            case InitialTransaction:
-                this.broadcastInitTx(message as InitialTransaction);
-                break;
-            case SignedTransaction:
-                this.broadcastSignedTx(message as SignedTransaction);
-                break;
-            default:
-                this.broadcastBlockchain(message as Block[]);
-                break;
-        }
+    broadcast(payload: unknown): void {
+        // this.log(`streams = ${this.streams}\n`);
+        const message: Payload = { payload };
+        this.streams.forEach((stream) => {
+            stream.write(JSON.stringify(message));
+        });
     }
-
-    broadcastBlock(block: Block) {}
-    broadcastBlockchain(blockchain: Block[]) {}
-    broadcastInitTx(tx: InitialTransaction) {}
-    broadcastSignedTx(tx: SignedTransaction) {}
 }

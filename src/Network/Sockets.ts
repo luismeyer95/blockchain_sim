@@ -50,6 +50,9 @@ class Topology extends events.EventEmitter {
         this.server = net.createServer((socket: net.Socket) => {
             this.onconnection(socket);
         });
+        this.server.on("listening", () => {
+            this.emit("listening");
+        });
         if (this.errorCallback) this.server.on("error", this.errorCallback);
 
         this.server.listen(port);
