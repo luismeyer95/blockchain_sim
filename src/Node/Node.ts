@@ -12,9 +12,12 @@ import {
 } from "../Transactions/Transactions";
 
 import INodeNet from "src/NodeNet/INodeNet";
-// import SwarmNet from "src/NodeNet/SwarmNet";
 import INodeProtocol from "src/NodeProtocol/INodeProtocol";
 import NodeProtocol from "src/NodeProtocol/NodeProtocol";
+import SwarmNet from "src/NodeNet/SwarmNet";
+import ILogger from "src/Logger/ILogger";
+import { log } from "src/Logger/Loggers";
+import { TwoWayMap } from "src/utils";
 
 export class Node {
     public blockchain: Block[];
@@ -22,37 +25,54 @@ export class Node {
     // public keypair: KeyPairKeyObjectResult;
 
     public protocol: INodeProtocol;
+    public net: INodeNet;
+    private log: ILogger;
+    private ctorDispatcher: TwoWayMap<any, any>;
 
     constructor(
         blockchain?: Block[],
-        protocol: INodeProtocol = new NodeProtocol()
+        protocol: INodeProtocol = new NodeProtocol(),
+        net: INodeNet = new SwarmNet(),
+        logger: ILogger = log
     ) {
         this.blockchain = blockchain ?? [];
         this.pendingTransactions = [];
-
         this.protocol = protocol;
+        this.net = net;
+        this.log = logger;
+        this.ctorDispatcher = new TwoWayMap<any, (...args: any[]) => any>(
+            [InitialTransaction, this.receiveTransaction.bind(this)],
+            [SignedTransaction, this.receiveTransaction.bind(this)],
+            [Block, this.receiveBlock.bind(this)]
+        );
+        this.hookToNetwork();
+    }
 
-        this.protocol.on("initial_tx", (tx: InitialTransaction) => {
-            try {
-                console.log("[received initial_tx]");
-                this.collectTransaction(tx);
-            } catch (err) {
-                console.error(
-                    "caught invalid initial transaction from peer, ignored"
-                );
+    private hookToNetwork() {
+        this.net.on("payload", (payload: unknown) => {
+            const resource = this.protocol.interpretMessage(payload);
+            if (!resource) {
+                this.log("[received bad protocol payload, ignored]\n");
+                return;
             }
+            const resourceHandler = this.ctorDispatcher.getValue(
+                resource.constructor
+            );
+            resourceHandler(resource);
         });
+    }
 
-        this.protocol.on("signed_tx", (tx: SignedTransaction) => {
-            try {
-                console.log("[received signed_tx]");
-                this.collectTransaction(tx);
-            } catch (err) {
-                console.error(
-                    "caught invalid signed transaction from peer, ignored"
-                );
-            }
-        });
+    private receiveTransaction(tx: InitialTransaction | SignedTransaction) {
+        try {
+            this.log("[collecting received tx]\n");
+            this.collectTransaction(tx);
+        } catch (err) {
+            this.log("[received tx is invalid, ignored]\n");
+        }
+    }
+
+    private receiveBlock(block: Block) {
+        // to implement
     }
 
     createInitialTransaction(keypair: KeyPairKeyObjectResult, amount: number) {
@@ -62,7 +82,8 @@ export class Node {
         });
         this.collectTransaction(initTx);
         // broadcast tx here
-        this.protocol.process(initTx);
+        const message = this.protocol.createMessage(initTx);
+        this.net.broadcast(message);
     }
 
     createSignedTransaction(tx: SignedTransaction, privateKey: KeyObject) {
@@ -91,7 +112,8 @@ export class Node {
         txProcessed.sign(privateKey);
         this.collectTransaction(txProcessed);
         // broadcast tx here
-        this.protocol.process(txProcessed);
+        const message = this.protocol.createMessage(txProcessed);
+        this.net.broadcast(message);
     }
 
     collectTransaction(tx: InitialTransaction | SignedTransaction) {
@@ -185,10 +207,6 @@ export class Node {
         );
         return output ?? null;
     }
-
-    // broadcastTransaction(tx: SignedTransaction | InitialTransaction) {
-    //     this.pendingTransactions.push(tx);
-    // }
 
     mineBlock() {
         if (this.pendingTransactions.length === 0) return;

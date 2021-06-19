@@ -23,14 +23,14 @@ const node = new Node();
 const keypair = genKeyPair();
 
 process.stdin.on("data", () => {
-    // node.createInitialTransaction(keypair, 12);
+    node.createInitialTransaction(keypair, 12);
 
-    const tx = new SignedTransaction({
-        input: { from: keypair.publicKey },
-        outputs: [{ to: keypair.publicKey, amount: 15 }],
-    });
-    tx.sign(keypair.privateKey);
-    node.protocol.process(tx);
+    // const tx = new SignedTransaction({
+    //     input: { from: keypair.publicKey },
+    //     outputs: [{ to: keypair.publicKey, amount: 15 }],
+    // });
+    // tx.sign(keypair.privateKey);
+    // node.protocol.process(tx);
 });
 
 // console.log(JSON.parse(JSON.stringify([1, 2, 3, 4])));

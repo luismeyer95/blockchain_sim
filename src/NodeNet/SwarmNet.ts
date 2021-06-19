@@ -10,6 +10,9 @@ import Topology from "src/Network/Sockets";
 import register from "register-multicast-dns";
 import toPort from "hash-to-port";
 
+import ILogger from "src/Logger/ILogger";
+import { log } from "src/Logger/Loggers";
+
 import { v4 as generateUUID } from "uuid";
 import INodeProtocol from "src/NodeProtocol/INodeProtocol";
 import NodeProtocol from "src/NodeProtocol/NodeProtocol";
@@ -29,7 +32,6 @@ const NetworkMessage = z.object({
         type: z.string(),
         table: z.string().array(),
     }),
-    // protocol: z.any()
 });
 
 const Payload = z.object({
@@ -46,7 +48,9 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
     public streams: StreamSet;
     private defaultId: string = "default";
 
-    constructor(protocol?: INodeProtocol) {
+    private log: ILogger;
+
+    constructor(logger: ILogger = log) {
         super();
         this.streams = new StreamSet();
         const fallback = () => {
@@ -55,10 +59,8 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
         this.tryListen(this.defaultId, [], fallback);
     }
 
-    log(data: string): void {
-        process.stdout.clearLine(-1); // clear current text
-        process.stdout.cursorTo(0);
-        process.stdout.write(data);
+    public shortenId(id: string) {
+        return id.slice(0, this.defaultId.length);
     }
 
     private tryListen(id: string, peerIds: string[], fallback?: () => void) {
@@ -81,56 +83,72 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
         this.log(`[listening on ${IdToAddress(this.id)}]\n`);
     }
 
-    private onConnection(newPeer: Socket, peerAddress: string) {
-        this.log(`[${peerAddress} joined]\n`);
+    private sendPeerTable(peer: Socket) {
+        const peerTableMsg: NetworkMessage = {
+            peer: {
+                type: "peer_table",
+                table: this.peerIds,
+            },
+        };
+        this.send(peerTableMsg, peer);
 
-        this.emit("connection");
-        // add comm socket to set
-        this.streams.add(newPeer);
+    }
+
+    private processNetworkMessage(
+        obj: unknown,
+        peer: Socket,
+        peerAddress: string
+    ) {
+        let netValidation = NetworkMessage.safeParse(obj);
+
+        if (netValidation.success) {
+            if (netValidation.data.peer.type === "peer_table") {
+                const shid = this.shortenId(addressToId(peerAddress));
+                this.log(`[received ${shid}'s peer table]\n`);
+                const table = netValidation.data.peer.table;
+                // only keep received table entries that are not in my table and
+                // that don't reference myself
+                const unknownPeers = table.filter(
+                    (peerId: string) =>
+                        !this.peerIds.includes(peerId) && peerId !== this.id
+                );
+                unknownPeers.forEach((peerId: string) => {
+                    this.peerIds.push(peerId);
+                    this.log(`[adding ${this.shortenId(peerId)} to swarm]\n`);
+                    this.swarm.add(IdToAddress(peerId));
+                });
+            }
+        }
+    }
+
+    private processPayload(obj: unknown) {
+        let payloadValidation = Payload.safeParse(obj);
+        if (payloadValidation.success) {
+            this.emit("payload", payloadValidation.data.payload);
+        }
+    }
+
+    private updatePeerTable(peerAddress: string) {
         // add string id of peer only if it's not already there and not my id
         const peerId = addressToId(peerAddress);
         if (!this.peerIds.find((id) => id === peerId))
             this.peerIds.push(peerId);
-        // send peer table
-        const peerTableMsg: NetworkMessage = {
-            peer: {
-                type: "PEER_TABLE",
-                table: this.peerIds,
-            },
-        };
-        newPeer.write(JSON.stringify(peerTableMsg));
+    }
+
+    private onConnection(newPeer: Socket, peerAddress: string) {
+        this.emit("connection");
+        const shid = this.shortenId(addressToId(peerAddress));
+        this.log(`[${shid} joined]\n`);
+        // add comm socket to set
+        this.streams.add(newPeer);
+        this.updatePeerTable(peerAddress);
+        this.sendPeerTable(newPeer);
         newPeer.on("data", (data: Buffer) => {
-            this.log("[received data from peer]\n");
+            this.log(`[received data from peer ${}]\n`);
             const strdata: string = data.toString();
             const obj: unknown = JSON.parse(strdata);
-
-            let netValidation = NetworkMessage.safeParse(obj);
-
-            if (netValidation.success) {
-                if (netValidation.data.peer.type === "PEER_TABLE") {
-                    // console.log("is unknown?");
-                    this.log(`[received ${peerAddress}'s peer table]\n`);
-                    const table = netValidation.data.peer.table;
-                    // only keep received table entries that are not in my table and
-                    // that don't reference myself
-                    const unknownPeers = table.filter(
-                        (peerId: string) =>
-                            !this.peerIds.includes(peerId) && peerId !== this.id
-                    );
-                    unknownPeers.forEach((peerId: string) => {
-                        this.peerIds.push(peerId);
-                        this.log(`[adding ${IdToAddress(peerId)} to swarm]\n`);
-                        this.swarm.add(IdToAddress(peerId));
-                    });
-                }
-            }
-
-            let payloadValidation = Payload.safeParse(obj);
-            if (payloadValidation.success) {
-                this.emit("payload", payloadValidation.data.payload);
-            }
-            // only keep received table entries that are not in my table and
-            // that don't reference myself
+            this.processNetworkMessage(obj, newPeer, peerAddress);
+            this.processPayload(obj);
         });
         newPeer.on("close", () => {
             this.peerIds = this.peerIds.filter(
@@ -140,10 +158,13 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
     }
 
     broadcast(payload: unknown): void {
-        // this.log(`streams = ${this.streams}\n`);
         const message: Payload = { payload };
         this.streams.forEach((stream) => {
-            stream.write(JSON.stringify(message));
+            this.send(message, stream);
         });
+    }
+
+    private send(message: Payload | NetworkMessage, peer: Socket) {
+        peer.write(JSON.stringify(message));
     }
 }

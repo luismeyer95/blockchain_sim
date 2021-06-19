@@ -8,17 +8,13 @@ import {
 
 export type INodeProtocolObjects =
     | Block
-    | Block[]
+    // | Block[]
     | InitialTransaction
     | SignedTransaction;
 
-export default interface INodeProtocol extends EventEmitter {
+export default interface INodeProtocol {
     // pass object data from the Node to the Protocol
 
-    process(message: INodeProtocolObjects): void;
-
-    // onBlock(callback: (item: Block) => void): void;
-    // onBlockchain(callback: (item: Block[]) => void): void;
-    // onSignedTransaction(callback: (item: SignedTransaction) => void): void;
-    // onInitialTransaction(callback: (item: InitialTransaction) => void): void;
+    createMessage(resource: INodeProtocolObjects): unknown;
+    interpretMessage(payload: unknown): INodeProtocolObjects | null;
 }
