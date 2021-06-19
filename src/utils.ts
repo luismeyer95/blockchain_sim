@@ -54,3 +54,7 @@ export class TwoWayMap<K, V> {
             throw new Error("map: values are not unique");
     }
 }
+
+export function dec2bin(dec: number) {
+    return (dec >>> 0).toString(2);
+}

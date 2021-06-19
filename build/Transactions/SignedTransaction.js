@@ -17,6 +17,7 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SignedTransaction = void 0;
+var InputOutput_1 = require("./InputOutput");
 var Encryption_1 = require("../Encryption/Encryption");
 var SignedTransaction = /** @class */ (function () {
     function SignedTransaction(tx) {
@@ -30,6 +31,29 @@ var SignedTransaction = /** @class */ (function () {
             this.timestamp = tx.timestamp || Date.now();
         }
     }
+    SignedTransaction.isSignedTransaction = function (json) {
+        try {
+            var obj = new SignedTransaction(json);
+            if (!Array.isArray(obj.outputs))
+                return false;
+            var ret_1 = true;
+            obj.outputs.forEach(function (output) {
+                if (!InputOutput_1.isOutput(output))
+                    ret_1 = false;
+            });
+            // console.log(ret);
+            // console.log(typeof obj.timestamp === "number");
+            // console.log(
+            //     Buffer.isBuffer(obj.signature) || obj.signature === undefined
+            // );
+            return (ret_1 &&
+                typeof obj.timestamp === "number" &&
+                (Buffer.isBuffer(obj.signature) || obj.signature === undefined));
+        }
+        catch (_a) {
+            return false;
+        }
+    };
     SignedTransaction.prototype.isValid = function () {
         if (!this.signature)
             return false;

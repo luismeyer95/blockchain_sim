@@ -88,28 +88,37 @@ export function keyEquals(a: KeyObject, b: KeyObject) {
     return serializeKey(a) === serializeKey(b);
 }
 
-type ExcludeHashNonce<T> = Omit<T, "hash" | "nonce"> extends T
-    ? Omit<T, "hash" | "nonce">
-    : never;
+type isNonceGoldReturnType =
+    | {
+          success: true;
+          hash: Buffer;
+      }
+    | {
+          success: false;
+      };
 
-export const findNonce = <T>(
-    data: ExcludeHashNonce<T>,
+export function isNonceGold(
+    nonce: number,
+    data: string,
     leadingZeroBits: number
-): { hash: Buffer; nonce: number } => {
-    if (leadingZeroBits < 0 || leadingZeroBits > 32)
-        throw new Error("findNonce error: invalid leadingZeroBits argument");
+): isNonceGoldReturnType {
+    if (leadingZeroBits <= 0 || leadingZeroBits > 32)
+        throw new Error("error: invalid leading zero bits argument");
 
-    const bitstr = "0".repeat(32 - leadingZeroBits).padStart(32, "1");
-    const bitnum = parseInt(bitstr, 2);
+    const shift = 1 << (32 - leadingZeroBits);
+    const bitnum = ~(shift - 1);
+    const input = JSON.stringify({
+        nonce,
+        data,
+    });
+    const hashRes = hash(Buffer.from(input));
+    const buf = hashRes.copy().digest();
+    const u32 = buf.readUInt32BE();
 
-    const obj = { ...data, nonce: 0 };
-    let u32, hashRes, buf;
-    do {
-        hashRes = hash(Buffer.from(JSON.stringify(obj)));
-        buf = hashRes.copy().digest();
-        u32 = buf.readUInt32BE();
-        obj.nonce += 1;
-    } while (u32 & bitnum);
-
-    return { hash: buf, nonce: obj.nonce - 1 };
-};
+    const success = (u32 & bitnum) === 0;
+    if (!success) return { success: false };
+    return {
+        success,
+        hash: buf,
+    };
+}

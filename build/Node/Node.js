@@ -1,15 +1,57 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Node = void 0;
 var Encryption_1 = require("../Encryption/Encryption");
 var utils_1 = require("../utils");
+// import _, { has, initial, last } from "lodash";
 var Block_1 = require("../Block/Block");
 var Transactions_1 = require("../Transactions/Transactions");
+var NodeProtocol_1 = __importDefault(require("src/NodeProtocol/NodeProtocol"));
+var SwarmNet_1 = __importDefault(require("src/NodeNet/SwarmNet"));
+var Loggers_1 = require("src/Logger/Loggers");
+var utils_2 = require("src/utils");
 var Node = /** @class */ (function () {
-    function Node(blockchain) {
+    function Node(blockchain, protocol, net, logger) {
+        if (protocol === void 0) { protocol = new NodeProtocol_1.default(); }
+        if (net === void 0) { net = new SwarmNet_1.default(); }
+        if (logger === void 0) { logger = Loggers_1.log; }
         this.blockchain = blockchain !== null && blockchain !== void 0 ? blockchain : [];
         this.pendingTransactions = [];
+        this.protocol = protocol;
+        this.net = net;
+        this.log = logger;
+        this.ctorDispatcher = new utils_2.TwoWayMap([Transactions_1.InitialTransaction, this.receiveTransaction.bind(this)], [Transactions_1.SignedTransaction, this.receiveTransaction.bind(this)], [Block_1.Block, this.receiveBlock.bind(this)]);
+        this.hookToNetwork();
     }
+    Node.prototype.hookToNetwork = function () {
+        var _this = this;
+        this.net.on("payload", function (payload) {
+            _this.log("[payload = " + JSON.stringify(payload) + "]\n");
+            var resource = _this.protocol.interpretMessage(payload);
+            if (!resource) {
+                _this.log("[received bad protocol payload, ignored]\n");
+                return;
+            }
+            var resourceHandler = _this.ctorDispatcher.getValue(resource.constructor);
+            resourceHandler(resource);
+        });
+    };
+    Node.prototype.receiveTransaction = function (tx) {
+        try {
+            var txstring = tx instanceof Transactions_1.InitialTransaction ? "initial_tx" : "signed_tx";
+            this.log("[collecting received " + txstring + "]\n");
+            this.collectTransaction(tx);
+        }
+        catch (err) {
+            this.log("[received tx is invalid, ignored]\n");
+        }
+    };
+    Node.prototype.receiveBlock = function (block) {
+        // to implement
+    };
     Node.prototype.createInitialTransaction = function (keypair, amount) {
         var initTx = new Transactions_1.InitialTransaction({
             output: { to: keypair.publicKey, amount: amount, balance: amount },
@@ -17,6 +59,8 @@ var Node = /** @class */ (function () {
         });
         this.collectTransaction(initTx);
         // broadcast tx here
+        var message = this.protocol.createMessage(initTx);
+        this.net.broadcast(message);
     };
     Node.prototype.createSignedTransaction = function (tx, privateKey) {
         var lastOutput = this.findLastTransactionOutput(tx.input.from);
@@ -43,6 +87,8 @@ var Node = /** @class */ (function () {
         txProcessed.sign(privateKey);
         this.collectTransaction(txProcessed);
         // broadcast tx here
+        var message = this.protocol.createMessage(txProcessed);
+        this.net.broadcast(message);
     };
     Node.prototype.collectTransaction = function (tx) {
         this.validateTransaction(tx);
@@ -120,9 +166,6 @@ var Node = /** @class */ (function () {
         });
         return output !== null && output !== void 0 ? output : null;
     };
-    // broadcastTransaction(tx: SignedTransaction | InitialTransaction) {
-    //     this.pendingTransactions.push(tx);
-    // }
     Node.prototype.mineBlock = function () {
         var _a;
         if (this.pendingTransactions.length === 0)

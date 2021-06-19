@@ -44,6 +44,9 @@ var Topology = /** @class */ (function (_super) {
         this.server = net_1.default.createServer(function (socket) {
             _this.onconnection(socket);
         });
+        this.server.on("listening", function () {
+            _this.emit("listening");
+        });
         if (this.errorCallback)
             this.server.on("error", this.errorCallback);
         this.server.listen(port);
@@ -100,7 +103,7 @@ var Topology = /** @class */ (function (_super) {
     };
     Topology.prototype.onconnection = function (socket) {
         var _this = this;
-        console.log("onconnection emitted");
+        // console.log("onconnection emitted");
         // set socket to destroy on error and on a 15s timeout
         this.errorHandle(socket);
         length_prefixed_message_1.default.read(socket, function (from) {

@@ -6,6 +6,7 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InitialTransaction = void 0;
+var InputOutput_1 = require("./InputOutput");
 var Encryption_1 = require("../Encryption/Encryption");
 var InitialTransaction = /** @class */ (function () {
     function InitialTransaction(tx) {
@@ -17,6 +18,16 @@ var InitialTransaction = /** @class */ (function () {
             this.timestamp = tx.timestamp;
         }
     }
+    InitialTransaction.isInitialTransaction = function (obj) {
+        try {
+            obj = new InitialTransaction(obj);
+            return (InputOutput_1.isOutput(obj.output) &&
+                typeof obj.timestamp === "number");
+        }
+        catch (_a) {
+            return false;
+        }
+    };
     InitialTransaction.prototype.serialize = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {

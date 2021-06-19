@@ -1,6 +1,6 @@
 import { SignedTransaction } from "../Transactions/SignedTransaction";
 import { InitialTransaction } from "../Transactions/InitialTransaction";
-import { findNonce, hash } from "../Encryption/Encryption";
+import { hash } from "../Encryption/Encryption";
 import ISerializable from "src/Serializable/ISerializable";
 
 export interface IBlock {
@@ -55,20 +55,20 @@ export class Block implements IBlock, ISerializable {
         }
     }
 
-    mine(nonce: number, leadingZeroBits: number): boolean {
-        if (leadingZeroBits < 0 || leadingZeroBits > 32)
-            throw new Error(
-                "findNonce error: invalid leadingZeroBits argument"
-            );
+    // mine(nonce: number, leadingZeroBits: number): boolean {
+    //     if (leadingZeroBits < 0 || leadingZeroBits > 32)
+    //         throw new Error(
+    //             "findNonce error: invalid leadingZeroBits argument"
+    //         );
 
-        const bitstr = "0".repeat(32 - leadingZeroBits).padStart(32, "1");
-        const bitnum = parseInt(bitstr, 2);
+    //     const bitstr = "0".repeat(32 - leadingZeroBits).padStart(32, "1");
+    //     const bitnum = parseInt(bitstr, 2);
 
-        const hashRes = hash(Buffer.from(JSON.stringify(this)));
-        const buf = hashRes.copy().digest();
-        const u32 = buf.readUInt32BE();
-        return !(u32 & bitnum);
-    }
+    //     const hashRes = hash(Buffer.from(JSON.stringify(this)));
+    //     const buf = hashRes.copy().digest();
+    //     const u32 = buf.readUInt32BE();
+    //     return !(u32 & bitnum);
+    // }
 
     // static isBlock(obj: any): obj is Block {
     //     let ret =

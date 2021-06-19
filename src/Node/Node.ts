@@ -22,7 +22,6 @@ import { TwoWayMap } from "src/utils";
 export class Node {
     public blockchain: Block[];
     public pendingTransactions: Array<SignedTransaction | InitialTransaction>;
-    // public keypair: KeyPairKeyObjectResult;
 
     public protocol: INodeProtocol;
     public net: INodeNet;
@@ -65,7 +64,9 @@ export class Node {
 
     private receiveTransaction(tx: InitialTransaction | SignedTransaction) {
         try {
-            this.log("[collecting received tx]\n");
+            const txstring =
+                tx instanceof InitialTransaction ? "initial_tx" : "signed_tx";
+            this.log(`[collecting received ${txstring}]\n`);
             this.collectTransaction(tx);
         } catch (err) {
             this.log("[received tx is invalid, ignored]\n");

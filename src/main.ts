@@ -11,26 +11,41 @@ import {
     verify,
     hash,
     serializeKey,
-    findNonce,
 } from "./Encryption/Encryption";
 import readline from "readline";
 import { exit } from "process";
 
 import SwarmNet from "./NodeNet/SwarmNet";
 
-const node = new Node();
+import ProofWorker, { PowProcessMessage } from "src/BlockProofing/ProofWorker";
+import { dec2bin } from "./utils";
 
-const keypair = genKeyPair();
+// const node = new Node();
 
-process.stdin.on("data", () => {
-    node.createInitialTransaction(keypair, 12);
+// const keypair = genKeyPair();
 
-    // const tx = new SignedTransaction({
-    //     input: { from: keypair.publicKey },
-    //     outputs: [{ to: keypair.publicKey, amount: 15 }],
-    // });
-    // tx.sign(keypair.privateKey);
-    // node.protocol.process(tx);
+// process.stdin.on("data", () => {
+//     node.createInitialTransaction(keypair, 12);
+
+//     const tx = new SignedTransaction({
+//         input: { from: keypair.publicKey },
+//         outputs: [{ to: keypair.publicKey, amount: 15 }],
+//     });
+//     tx.sign(keypair.privateKey);
+//     node.protocol.process(tx);
+// });
+
+const worker = new ProofWorker();
+
+worker.updateTaskData("can i please get the coq por favor", 4);
+
+const showNonce = (data: PowProcessMessage) => {
+    console.log("~ FOUND GOLD NONCE! ~");
+    console.log(data);
+};
+
+worker.once("pow", (data: PowProcessMessage) => {
+    showNonce(data);
+    worker.updateTaskData("ok", 1);
+    worker.once("pow", showNonce);
 });
-
-// console.log(JSON.parse(JSON.stringify([1, 2, 3, 4])));
