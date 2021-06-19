@@ -50,6 +50,7 @@ export class Node {
 
     private hookToNetwork() {
         this.net.on("payload", (payload: unknown) => {
+            this.log(`[payload = ${JSON.stringify(payload)}]\n`);
             const resource = this.protocol.interpretMessage(payload);
             if (!resource) {
                 this.log("[received bad protocol payload, ignored]\n");

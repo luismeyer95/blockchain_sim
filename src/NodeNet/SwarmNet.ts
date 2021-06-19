@@ -52,6 +52,7 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
 
     constructor(logger: ILogger = log) {
         super();
+        this.log = logger;
         this.streams = new StreamSet();
         const fallback = () => {
             this.tryListen(generateUUID(), [this.defaultId], fallback);
@@ -91,7 +92,6 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
             },
         };
         this.send(peerTableMsg, peer);
-
     }
 
     private processNetworkMessage(
@@ -144,7 +144,7 @@ export default class SwarmNet extends EventEmitter implements INodeNet {
         this.updatePeerTable(peerAddress);
         this.sendPeerTable(newPeer);
         newPeer.on("data", (data: Buffer) => {
-            this.log(`[received data from peer ${}]\n`);
+            this.log(`[received data from peer ${shid}]\n`);
             const strdata: string = data.toString();
             const obj: unknown = JSON.parse(strdata);
             this.processNetworkMessage(obj, newPeer, peerAddress);

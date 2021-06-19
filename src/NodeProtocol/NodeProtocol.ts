@@ -51,12 +51,13 @@ export default class NodeProtocol implements INodeProtocol {
     interpretMessage(
         payload: unknown
     ): Block | InitialTransaction | SignedTransaction | null {
-        this.ctorMap.getMap().forEach(([key, ctor]) => {
+        const map = this.ctorMap.getMap();
+        for (const [key, ctor] of map) {
             let validation = this.validatesProtocolMsgType(key, payload);
             if (validation.success) {
                 return new ctor(validation.data.payload);
             }
-        });
+        }
         return null;
     }
 }
