@@ -32,6 +32,7 @@ export default class ProofWorker
         this.worker = fork("./src/BlockProofing/pow_process.ts", [], {
             execArgv: ["-r", "ts-node/register"],
         });
+        // this.worker = fork("pow_process.ts");
         this.worker.on("message", (msg: unknown) => {
             const messageValidation = PowProcessMessage.safeParse(msg);
             if (messageValidation.success) {
