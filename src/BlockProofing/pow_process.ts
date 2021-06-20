@@ -26,22 +26,27 @@ process.on("message", (msg: string) => {
     if (messageValidation.success) {
         currentData = messageValidation.data.data;
         complexity = messageValidation.data.complexity;
+        nonce = 0;
     } else {
         console.error("[pow worker]: bad message");
     }
 });
 
+function sendProof() {
+    process.send!({
+        data: currentData,
+        complexity,
+        nonce,
+    });
+    // process.exit(0);
+}
+
 function mine() {
     if (currentData) {
         const checkNonce = isNonceGold(nonce, currentData, complexity);
         if (checkNonce.success) {
-            process.send!({
-                data: currentData,
-                complexity,
-                nonce,
-            });
+            sendProof();
             currentData = null;
-            // process.exit(0);
         } else {
             ++nonce;
         }

@@ -94,7 +94,7 @@ interface IBlock {
         previous_hash: string | null;
 
         // miner's reward
-        coinbase_tx: ICoinbaseTransaction;
+        coinbase: ICoinbaseTransaction;
 
         // array of account transactions
         txs: IAccountTransaction[];
@@ -123,11 +123,23 @@ interface IBlock {
 // block validation involves:
 //      - validating the block hash proof with the correct complexity by hashing
 //        the payload, checking leading zeros and checking against block.header.hash
+//      - block.coinbase.payload really hashes to block.coinbase.header.hash
 //      - block.payload.prev_hash === prevblock.header.hash
-//      - checking (coinbase.header.signature, coinbase.payload.to public key)
+//      - checking (block.coinbase.header.signature, block.coinbase.payload.to.address)
 //      - block.payload.index is an increment of the previous block's index
 //      - if current block is not genesis, make sure that the following is true =>
 //        prevblock.payload.timestamp < block.payload.timestamp < Date.now()
-//      - same goes for prevblock.payload.coinbase_tx.timestamp
-//      - validate account transactions(**) and compute total transaction fees
-//      - validate that block.coinbase.payload.to.operation
+//      - same goes for prevblock.payload.coinbase.timestamp
+//      - validate block.coinbase.to, which involves:
+//          - finding the tx referenced by to.last_ref in previous blocks
+//          - if it exists and isn't referenced as last_ref by another tx, OK
+//          - check this by iterating the blockchain backwards to find the hash and checking
+//            for a dupe last_ref at the same time, rejecting if you find one
+//          - if an unreferenced tx is found => to.updated_balance = unreftx.
+//      - validate account transactions(**) and compute sum(tx fees)
+//      - validate that block.coinbase.payload.to.operation === block reward + sum(tx fees)
+
+// account transaction validation involves:
+//      - verify(tx.header.signature, tx.payload.from.address) with tx.payload as data
+//      - validate that tx.payload hashes to tx.header.hash
+//      -

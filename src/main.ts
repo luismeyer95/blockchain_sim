@@ -37,7 +37,7 @@ import { dec2bin } from "./utils";
 
 const worker = new ProofWorker();
 
-worker.updateTaskData("can i please get the coq por favor", 4);
+worker.updateTaskData("can i please get the coq por favor", 20);
 
 const showNonce = (data: PowProcessMessage) => {
     console.log("~ FOUND GOLD NONCE! ~");
@@ -46,6 +46,6 @@ const showNonce = (data: PowProcessMessage) => {
 
 worker.once("pow", (data: PowProcessMessage) => {
     showNonce(data);
-    worker.updateTaskData("ok", 1);
+    worker.updateTaskData("ok", 21);
     worker.once("pow", showNonce);
 });
