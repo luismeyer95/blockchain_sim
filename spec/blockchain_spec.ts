@@ -1,4 +1,114 @@
-import { z } from "zod";
+// REQUIREMENTS
+
+// need a way to retrieve a local copy of the blockchain from the network
+// need a way to maintain/update local blockchain as to reflect consensus
+// need a way to validate data shape for resources (tx, block, blockchain)
+// need a way to serialize/deserialize each resource type
+// where do all blockchain mutations originate?
+//      - nodes mine blocks and broadcast them for validation
+// a node does not need to mine, but it must maintain consensus with the
+// network to accurately represent the real-time state of the ledger and
+// perform operations on it
+
+// REACHING CONSENSUS
+//      1. on node network initialization, broadcast a GET_LAST_BLOCK request
+//      2. ask the full chain to any node that responded with the
+//         most recurrent block hash using a GET_FULL_CHAIN request
+//      3. store the full chain locally
+
+// MAINTAINING CONSENSUS
+//      1. listen for broadcasted blocks
+//      2. on block reception:
+//         if its index is superior to my latest block:
+//              - request the blocks I'm missing with a GET_PARTIAL_CHAIN
+//                ex: my latest block is #4, i received #7, ask for #5 and #6
+//              - validate + append to local chain if valid
+//         else if the received block clashes with a block of my local chain BUT is a
+//         valid append to the block before it
+//              - mark received block # as potential fork point
+//              - subsequent GET_PARTIAL_CHAIN requests to longer chained
+//                nodes should ask for the blocks from the fork point onward
+//                for extended validation
+//              - the first partial chain request to result in local validation of
+//                the block # FOLLOWING the fork point is the consensus, save locally
+//                and reset back to normal state
+
+// BLOCKCHAIN WRAPPER
+
+// This object owns the actual blockchain data structure, as well as the resource
+// validators and parsers that it needs to validate local blockchain mutations.
+
+// NODE
+
+// The node owns an abstract reference to the blockchain object and is responsible
+// for maintaining blockchain state by interfacing with both the protocol layer and
+// the blockchain wrapper. The node owns an instance of a class that implements
+// the protocol interface. It can listen to broadcast events and call its functions
+// to request/broadcast data, passing a callback handling the response if needed.
+// The data received inside the callback should be a standard data type (string)
+// representing the raw data payload that will then be passed to the blockchain wrapper
+// instance for parsing, validation and processing.
+
+// The node is also the message originator. Following the state of its local blockchain,
+// communication history or transaction queue, a node will make decisions and initiate
+// requests/broadcasts.
+
+// RESOURCE PARSERS/VALIDATORS
+
+// The validators will perform runtime type checking on protocol payloads in order
+// to map them to static types. If no validator returns success, data is considered
+// malformed and a 'bad data' protocol response is sent back to the protocol layer
+// by the node (maybe through a specific status code/enum mapping enforced by the
+// protocol interface?)
+
+// PROTOCOL
+
+// A blockchain protocol should allow:
+// 1. Reaching and maintaining consensus
+// 2. Sharing of local chain state to drive consensus
+
+// A possible protocol data/action mapping could be:
+//  - GET_LAST_BLOCK: request the last block
+//  - GET_FULL_CHAIN: request the full blockchain
+//  - GET_PARTIAL_CHAIN: request a block range from the chain
+//  - BLOCK: share a local append to my chain, or relay
+//    received/validated/appended block
+//  - TX: share a locally created transaction, or relay a
+//    received/validated tx
+
+// The protocol instance listens for raw data events on the network layer,
+// checks messages for protocol-specific events and fires associated callbacks
+// provided to event listeners by the node (ex: onLastBlockRequest(),
+// onFullChainRequest(), onPartialChainRequest(), onBlock(), onTransaction())
+
+// The node is given a protocol instance on instantiation. The protocol does NOT NEED
+// to know about the payload data shape. It simply ensures the consistent formatting
+// of protocol request/response HEADERS and the proper handling of message forwarding
+// that depends on protocol layer information (such as a status field in a response).
+// Note that whether the actions incur a broadcast or a single peer request is up to
+// implementation, as the protocol can interact with the network layer API to use either.
+
+// An implementation of this component interface benefits from flexibility in the means of
+// exchange between nodes. Since the protocol layer directly interacts with the network layer,
+// it makes it possible to implement an internal sub-protocol, with its own request/response
+// cycle (ex: initial public key provision before exchange of encrypted data)
+
+// NETWORK
+
+// We can derive network requirements from what we've covered so far. A node should be
+// able to broadcast data to as many peers as possible or engage in a request/response
+// cycle with a chosen peer. Since no specific way of managing peers is enforced by the
+// interface, topology can be handled in any way. However, broadcasted data should not
+// loop back to a node. Keeping an internal message cache is one way of getting around
+// loopback relaying.
+
+// PEER DISCOVERY
+
+// This component's sole task is to find other peers on the network and forward
+// the communication sockets to the network layer. TCP hole punching, DNS seeds,
+// local multicast... etc
+
+// RESOURCES
 
 interface IAccountOperation {
     // public key of account
@@ -146,112 +256,3 @@ interface IBlock {
 //      - validate unicity of addresses across tx.payload.to array
 //      - operation should be - for tx.payload.from and + for tx.payload.to
 //      - validate that tx.payload.from.operation + sum(tx.payload.to[].operation) + miner_fee === 0
-
-// REQUIREMENTS
-
-// need a way to validate data shape for account transactions, blocks and blockchain
-// need a way to serialize/deserialize each resource type
-// need a way to retrieve a local copy of the blockchain from the network
-// need a way to maintain/update local blockchain as to reflect consensus
-// where do all blockchain mutations originate?
-//      - nodes mine blocks and broadcast them for validation
-// a node does not need to mine, but it must maintain consensus with the network
-// to accurately represent the real-time state of the ledger and perform operations on it
-
-// REACHING CONSENSUS
-//      1. on node network initialization, broadcast a GET_LAST_BLOCK request
-//      2. ask the full chain to any node that responded with the
-//         most recurrent block hash using a GET_FULL_CHAIN request
-//      3. store the full chain locally
-
-// MAINTAINING CONSENSUS
-//      1. listen for broadcasted blocks
-//      2. on block reception:
-//         if its index is superior to my latest block:
-//              - request the blocks i'm missing with a GET_PARTIAL_CHAIN
-//                ex: my latest block is #4, i received #7, ask for #5 and #6
-//              - validate + append to local chain if valid
-//         else if the received block clashes with a block of my local chain BUT is a
-//         valid append to the block before it
-//              - mark received block # as potential fork point
-//              - subsequent GET_PARTIAL_CHAIN requests to longer chained
-//                nodes should ask for the blocks from the fork point onward
-//                for extended validation
-//              - the first partial chain request to result in local validation of
-//                the block # FOLLOWING the fork point is the consensus, save locally
-//                and reset back to normal state
-
-// BLOCKCHAIN WRAPPER
-
-// This object owns the actual blockchain data structure, as well as the resource
-// validators and parsers that it needs to validate local blockchain mutations.
-
-// NODE
-
-// The node owns an abstract reference to the blockchain object and is responsible
-// for maintaining blockchain state by interfacing with both the protocol layer and
-// the blockchain wrapper. The node owns an object instance of a class that implements
-// the protocol interface. It can listen to broadcast events and call its functions
-// to request/broadcast data, passing a callback handling the response if needed.
-// The data received inside the callback should be a standard data type (string)
-// representing the raw data payload that will then be passed to the blockchain wrapper
-// instance for parsing, validation and processing.
-
-// The node is also the message originator. Following the state of its local blockchain,
-// communication history or transaction queue, a node will make decisions and initiate
-// requests/broadcasts.
-
-// RESOURCE PARSERS/VALIDATORS
-
-// The validators will perform runtime type checking on protocol payloads in order
-// to map them to static types. If no validator returns success, data is considered
-// malformed and a 'bad data' protocol response is sent back to the protocol layer
-// by the node (maybe through a specific status code/enum mapping enforced by the
-// protocol interface?)
-
-// PROTOCOL
-
-// A blockchain protocol should be able to allow:
-// 1. Reaching and maintaining consensus
-// 2. Sharing of local chain state to drive consensus
-
-// A possible protocol data/action mapping could be:
-//  - GET_LAST_BLOCK: request the last block
-//  - GET_FULL_CHAIN: request the full blockchain
-//  - GET_PARTIAL_CHAIN: request a block range from the chain
-//  - BLOCK: share a local append to my chain, or relay
-//    received/validated/appended block
-//  - TX: share a locally created transaction, or relay a
-//    received/validated tx
-
-// The protocol instance listens for raw data events on the network layer,
-// checks messages for protocol-specific events and fires associated callbacks
-// provided to event listeners by the node (ex: onLastBlockRequest(),
-// onFullChainRequest(), onPartialChainRequest(), onBlock(), onTransaction())
-
-// The node is given a protocol instance on instantiation. The protocol does NOT NEED
-// to know about the payload data shape. It simply ensures the consistent formatting
-// of protocol requests/response HEADERS and the proper handling of message forwarding
-// that depends on protocol layer information (such as a status field in a response).
-// Note that whether the actions incur a broadcast or a single peer request is up to
-// implementation, as the protocol can interact with the network layer API to use either.
-
-// An implementation of this component interface benefits from flexibility in the means of
-// exchange between nodes. Since the protocol layer directly interfaces with the network layer,
-// it makes it possible to implement an internal sub-protocol, with its own request/response
-// cycle (ex: initial public key provision before exchange of encrypted data)
-
-// NETWORK
-
-// We can derive network requirements from what we've covered so far. A node should be
-// able to broadcast data to as many peers as possible or engage in a request/response
-// cycle with a chosen peer. Since no specific way of managing peers is enforced by the
-// interface, topology can be handled in any way. However, broadcasted data should not
-// loop back to a node. Keeping an internal message cache is one way of getting around
-// loopback relaying.
-
-// PEER DISCOVERY
-
-// This component's sole task is to find other peers on the network and forward
-// the communication sockets to the network layer. TCP hole punching, DNS seeds,
-// local multicast... etc
