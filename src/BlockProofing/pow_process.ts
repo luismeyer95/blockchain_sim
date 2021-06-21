@@ -14,12 +14,6 @@ let nonce: number = 0;
 let currentData: string | null = null;
 let complexity: number = 32;
 
-setImmediate(mine);
-
-setInterval(() => {
-    console.log("mining...");
-}, 4000);
-
 process.on("message", (msg: string) => {
     const obj: unknown = JSON.parse(msg);
     const messageValidation = ParentProcessMessage.safeParse(obj);
@@ -32,14 +26,11 @@ process.on("message", (msg: string) => {
     }
 });
 
-function sendProof() {
-    process.send!({
-        data: currentData,
-        complexity,
-        nonce,
-    });
-    // process.exit(0);
-}
+setImmediate(mine);
+
+setInterval(() => {
+    console.log("mining...");
+}, 4000);
 
 function mine() {
     if (currentData) {
@@ -52,4 +43,12 @@ function mine() {
         }
     }
     setImmediate(mine);
+}
+
+function sendProof() {
+    process.send!({
+        data: currentData,
+        complexity,
+        nonce,
+    });
 }

@@ -112,7 +112,7 @@ interface IBlock {
 // 4. no broadcasted transactions because no coins yet, so miners only go
 //    for the block reward and don't dynamically update their coinbase tx with tx fees
 
-// 5. one node eventually finds the gold nonce for their block, signs it their private key
+// 5. one node eventually finds the gold nonce for their block, signs it w/ their private key
 //    and starts broadcasting the block
 
 // 6. receiving nodes try to validate the block
@@ -156,10 +156,10 @@ interface IBlock {
 // where do all blockchain mutations originate?
 //      - nodes mine blocks and broadcast them for validation
 // a node does not need to mine, but it must maintain consensus with the network
-// to accurately represent the state of the ledger and perform operations on it
+// to accurately represent the real-time state of the ledger and perform operations on it
 
 // REACHING CONSENSUS
-//      1. on node network initialization, broadcast a LAST_BLOCK request
+//      1. on node network initialization, broadcast a GET_LAST_BLOCK request
 //      2. ask the full chain to any node that responded with the
 //         most recurrent block hash using a GET_FULL_CHAIN request
 //      3. store the full chain locally
@@ -181,5 +181,77 @@ interface IBlock {
 //                the block # FOLLOWING the fork point is the consensus, save locally
 //                and reset back to normal state
 
-const accountTransactionParser = (data: unknown) => {};
-const accountTransactionValidator = (data: unknown, blockchain: any) => {};
+// BLOCKCHAIN WRAPPER
+
+// This object owns the actual blockchain data structure, as well as the resource
+// validators and parsers that it needs to validate local blockchain mutations.
+
+// NODE
+
+// The node owns an abstract reference to the blockchain object and is responsible
+// for maintaining blockchain state by interfacing with both the protocol layer and
+// the blockchain wrapper. The node owns an object instance of a class that implements
+// the protocol interface. It can listen to broadcast events and call its functions
+// to request/broadcast data, passing a callback handling the response if needed.
+// The data received inside the callback should be a standard data type (string)
+// representing the raw data payload that will then be passed to the blockchain wrapper
+// instance for parsing, validation and processing.
+
+// The node is also the message originator. Following the state of its local blockchain,
+// communication history or transaction queue, a node will make decisions and initiate
+// requests/broadcasts.
+
+// RESOURCE PARSERS/VALIDATORS
+
+// The validators will perform runtime type checking on protocol payloads in order
+// to map them to static types. If no validator returns success, data is considered
+// malformed and a 'bad data' protocol response is sent back to the protocol layer
+// by the node (maybe through a specific status code/enum mapping enforced by the
+// protocol interface?)
+
+// PROTOCOL
+
+// A blockchain protocol should be able to allow:
+// 1. Reaching and maintaining consensus
+// 2. Sharing of local chain state to drive consensus
+
+// A possible protocol data/action mapping could be:
+//  - GET_LAST_BLOCK: request the last block
+//  - GET_FULL_CHAIN: request the full blockchain
+//  - GET_PARTIAL_CHAIN: request a block range from the chain
+//  - BLOCK: share a local append to my chain, or relay
+//    received/validated/appended block
+//  - TX: share a locally created transaction, or relay a
+//    received/validated tx
+
+// The protocol instance listens for raw data events on the network layer,
+// checks messages for protocol-specific events and fires associated callbacks
+// provided to event listeners by the node (ex: onLastBlockRequest(),
+// onFullChainRequest(), onPartialChainRequest(), onBlock(), onTransaction())
+
+// The node is given a protocol instance on instantiation. The protocol does NOT NEED
+// to know about the payload data shape. It simply ensures the consistent formatting
+// of protocol requests/response HEADERS and the proper handling of message forwarding
+// that depends on protocol layer information (such as a status field in a response).
+// Note that whether the actions incur a broadcast or a single peer request is up to
+// implementation, as the protocol can interact with the network layer API to use either.
+
+// An implementation of this component interface benefits from flexibility in the means of
+// exchange between nodes. Since the protocol layer directly interfaces with the network layer,
+// it makes it possible to implement an internal sub-protocol, with its own request/response
+// cycle (ex: initial public key provision before exchange of encrypted data)
+
+// NETWORK
+
+// We can derive network requirements from what we've covered so far. A node should be
+// able to broadcast data to as many peers as possible or engage in a request/response
+// cycle with a chosen peer. Since no specific way of managing peers is enforced by the
+// interface, topology can be handled in any way. However, broadcasted data should not
+// loop back to a node. Keeping an internal message cache is one way of getting around
+// loopback relaying.
+
+// PEER DISCOVERY
+
+// This component's sole task is to find other peers on the network and forward
+// the communication sockets to the network layer. TCP hole punching, DNS seeds,
+// local multicast... etc

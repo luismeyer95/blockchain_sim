@@ -46,6 +46,6 @@ const showNonce = (data: PowProcessMessage) => {
 
 worker.once("pow", (data: PowProcessMessage) => {
     showNonce(data);
-    worker.updateTaskData("ok", 21);
+    worker.updateTaskData("okko", 21);
     worker.once("pow", showNonce);
 });
