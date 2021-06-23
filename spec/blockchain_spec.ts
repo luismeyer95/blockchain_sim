@@ -10,48 +10,64 @@
 // network to accurately represent the real-time state of the ledger and
 // perform operations on it
 
-// REACHING CONSENSUS
-//      1. on node network initialization, broadcast a GET_LAST_BLOCK request
-//      2. ask the full chain to any node that responded with the
-//         most recurrent block hash using a GET_FULL_CHAIN request
-//      3. store the full chain locally
-
-// MAINTAINING CONSENSUS
+// REACHING/MAINTAINING CONSENSUS
 //      1. listen for broadcasted blocks
 //      2. on block reception:
 //         if its index is superior to my latest block:
-//              - request the blocks I'm missing with a GET_PARTIAL_CHAIN
+//              - request the blocks I'm missing with a REQUEST_BLOCK_RANGE
 //                ex: my latest block is #4, i received #7, ask for #5 and #6
 //              - validate + append to local chain if valid
 //         else if the received block clashes with a block of my local chain BUT is a
 //         valid append to the block before it
 //              - mark received block # as potential fork point
-//              - subsequent GET_PARTIAL_CHAIN requests to longer chained
+//              - subsequent REQUEST_BLOCK_RANGE requests to longer chained
 //                nodes should ask for the blocks from the fork point onward
 //                for extended validation
 //              - the first partial chain request to result in local validation of
 //                the block # FOLLOWING the fork point is the consensus, save locally
 //                and reset back to normal state
 
-// BLOCKCHAIN WRAPPER
-
-// This object owns the actual blockchain data structure, as well as the resource
-// validators and parsers that it needs to validate local blockchain mutations.
-
 // NODE
 
 // The node owns an abstract reference to the blockchain object and is responsible
 // for maintaining blockchain state by interfacing with both the protocol layer and
-// the blockchain wrapper. The node owns an instance of a class that implements
+// the blockchain store. The node owns an instance of a class that implements
 // the protocol interface. It can listen to broadcast events and call its functions
 // to request/broadcast data, passing a callback handling the response if needed.
 // The data received inside the callback should be a standard data type (string)
-// representing the raw data payload that will then be passed to the blockchain wrapper
+// representing the raw data payload that will then be passed to the blockchain store
 // instance for parsing, validation and processing.
 
 // The node is also the message originator. Following the state of its local blockchain,
 // communication history or transaction queue, a node will make decisions and initiate
 // requests/broadcasts.
+
+// BLOCKCHAIN STORE
+
+// This object receives resource submissions from the node and attempts to keep
+// a record of the true state of the blockchain. It owns the actual blockchain
+// data structure and has knowledge of the data shape for every resource.
+
+// The blockchain store should provide the node with information on the stored chain
+// (or on received resources) that the node itself cannot retrieve (no knowledge of
+// data shape) in order to guide consensus decisions and handle requests (get a
+// specific block, block range, or the full chain as serialized data)
+
+// Block range validation should provide detailed information on whether:
+//  - block range is a valid append to the latest block
+//  - block range is a valid append to another block (fork)
+//  - block range is not a valid append to the block that precedes
+//    in my local chain
+//  - incomplete information: no knowledge of the preceding block
+//    of block range
+
+// After block range validation, those can be submitted to the store for update.
+// if the chain is valid, this action mutates the chain and overwrites blocks at
+// the corresponding indexes
+
+// Transaction validation means the transaction is an acceptable inclusion into
+// the next block to be mined according to the local blockchain, and can therefore
+// be stored inside a miner's pending transactions.
 
 // RESOURCE PARSERS/VALIDATORS
 
@@ -68,9 +84,7 @@
 // 2. Sharing of local chain state to drive consensus
 
 // A possible protocol data/action mapping could be:
-//  - GET_LAST_BLOCK: request the last block
-//  - GET_FULL_CHAIN: request the full blockchain
-//  - GET_PARTIAL_CHAIN: request a block range from the chain
+//  - REQUEST_BLOCK_RANGE: request a block range from the chain
 //  - BLOCK: share a local append to my chain, or relay
 //    received/validated/appended block
 //  - TX: share a locally created transaction, or relay a
@@ -78,8 +92,10 @@
 
 // The protocol instance listens for raw data events on the network layer,
 // checks messages for protocol-specific events and fires associated callbacks
-// provided to event listeners by the node (ex: onLastBlockRequest(),
-// onFullChainRequest(), onPartialChainRequest(), onBlock(), onTransaction())
+// provided to event listeners by the node (ex: request(), onRequest(), onResponse(),
+// onBlock(), onTransaction()). onRequest could take a callback that has a 'details'
+// parameter detailing the request type and a 'respond' callback taking a response status
+// and raw payload
 
 // The node is given a protocol instance on instantiation. The protocol does NOT NEED
 // to know about the payload data shape. It simply ensures the consistent formatting
