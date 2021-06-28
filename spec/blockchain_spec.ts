@@ -15,59 +15,46 @@
 //      2. on block reception:
 //         if its index is superior to my latest block:
 //              - request the blocks I'm missing with a REQUEST_BLOCK_RANGE
-//                ex: my latest block is #4, i received #7, ask for #5 and #6
-//              - validate + append to local chain if valid
-//         else if the received block clashes with a block of my local chain BUT is a
-//         valid append to the block before it
-//              - mark received block # as potential fork point
-//              - subsequent REQUEST_BLOCK_RANGE requests to longer chained
-//                nodes should ask for the blocks from the fork point onward
-//                for extended validation
-//              - the first partial chain request to result in local validation of
-//                the block # FOLLOWING the fork point is the consensus, save locally
-//                and reset back to normal state
+//                ex: my latest block is #4, i received #7, ask for #4, #5, #6 and #7
+//                if valid
+//                    - append to local chain
+//                else if incompatible with local chain
+//                    - request the full chain, if valid replace local chain
+//                    - else, do nothing
 
 // NODE
 
-// The node owns an abstract reference to the blockchain object and is responsible
-// for maintaining blockchain state by interfacing with both the protocol layer and
-// the blockchain store. The node owns an instance of a class that implements
+// The node owns the blockchain and is responsible
+// for maintaining 'best-blockchain' state by interfacing with the protocol layer,
+// the blockchain wrapper and a client API. The node owns an instance of a class that implements
 // the protocol interface. It can listen to broadcast events and call its functions
 // to request/broadcast data, passing a callback handling the response if needed.
 // The data received inside the callback should be a standard data type (string)
-// representing the raw data payload that will then be passed to the blockchain store
-// instance for parsing, validation and processing.
+// representing the raw data payload. The node then passes the string data to shape
+// validators and gets back a typed object. If the object is a block or block range,
+// the node takes decisions to make sure it keeps the longest valid chain.
 
 // The node is also the message originator. Following the state of its local blockchain,
 // communication history or transaction queue, a node will make decisions and initiate
 // requests/broadcasts.
 
+// receives blocks, be it from its interface or by broadcast/request events
+// validates its data shape and wrap it inside an object with a standard API
+// to extract information
+// need to determine if we would actually want the block or chain:
+//  - would its append result to a longer chain?
+//      involves validating block array shape, then picking the last index of the range
+//      through a block wrapper instance method + compare with local last index
+//  - is it actually appendable to our current chain? (index of first block follows
+//    any of our block's index)
+//      involves checking the first index of chain through a block wrapper instance
+//      method and comparing with our local chain indexes
+
 // BLOCKCHAIN STORE
 
-// This object receives resource submissions from the node and attempts to keep
-// a record of the true state of the blockchain. It owns the actual blockchain
-// data structure and has knowledge of the data shape for every resource.
-
-// The blockchain store should provide the node with information on the stored chain
-// (or on received resources) that the node itself cannot retrieve (no knowledge of
-// data shape) in order to guide consensus decisions and handle requests (get a
-// specific block, block range, or the full chain as serialized data)
-
-// Block range validation should provide detailed information on whether:
-//  - block range is a valid append to the latest block
-//  - block range is a valid append to another block (fork)
-//  - block range is not a valid append to the block that precedes
-//    in my local chain
-//  - incomplete information: no knowledge of the preceding block
-//    of block range
-
-// After block range validation, those can be submitted to the store for update.
-// if the chain is valid, this action mutates the chain and overwrites blocks at
-// the corresponding indexes
-
-// Transaction validation means the transaction is an acceptable inclusion into
-// the next block to be mined according to the local blockchain, and can therefore
-// be stored inside a miner's pending transactions.
+// The blockchain wrapper simply is a wrapper around the block array data structure.
+// It provides methods to manage the chain and extract useful information, along
+// with common operations.
 
 // RESOURCE PARSERS/VALIDATORS
 
@@ -146,9 +133,6 @@ interface IAccountOperation {
 // using the source acccount's public key
 interface IAccountTransaction {
     header: {
-        // base64 string representation of the tx payload hash
-        hash: string;
-
         // base64 string representation of the tx payload signed
         // with the source account private key
         signature: string;
@@ -172,9 +156,6 @@ interface IAccountTransaction {
 
 interface ICoinbaseTransaction {
     header: {
-        // base64 string representation of the coinbase payload hash
-        hash: string;
-
         // base64 string representation of the tx payload signed
         // with the MINER's private key.
         signature: string;
@@ -256,7 +237,7 @@ interface IBlock {
 //      - validate block.coinbase.payload.to, which involves:
 //          - finding the tx referenced by to.last_ref in previous blocks
 //          - if it exists and isn't referenced as last_ref by another tx, OK
-//          - check this by iterating the blockchain backwards to find the hash and checking
+//          - check this by iterating the blockchain backwards to find the tx hash and checking
 //            for a dupe last_ref at the same time, rejecting if you find one
 //          - if an unreferenced tx is found => good, then
 //              - (MIGHT NOT BE NEEDED?) if unreftx is account tx:

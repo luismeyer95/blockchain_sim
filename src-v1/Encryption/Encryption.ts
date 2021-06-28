@@ -122,24 +122,3 @@ export function isNonceGold(
         hash: buf,
     };
 }
-
-export function hashSatisfiesComplexity(
-    data: string,
-    complexity: number
-): isNonceGoldReturnType {
-    if (complexity <= 0 || complexity > 32)
-        throw new Error("error: invalid leading zero bits argument");
-
-    const shift = 1 << (32 - complexity);
-    const bitnum = ~(shift - 1);
-    const hashRes = hash(Buffer.from(data));
-    const buf = hashRes.copy().digest();
-    const u32 = buf.readUInt32BE();
-
-    const success = (u32 & bitnum) === 0;
-    if (!success) return { success: false };
-    return {
-        success,
-        hash: buf,
-    };
-}
