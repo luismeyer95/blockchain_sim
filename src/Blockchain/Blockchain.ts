@@ -175,7 +175,24 @@ export class Blockchain implements IBlockchain {
         throw new Error("last reference not found");
     }
 
-    private verifyNoDupeRefWithinBlock(block: BlockType) {}
+    private verifyNoDupeRefWithinBlock(block: BlockType) {
+        const keyRefPairs = [
+            block.payload.coinbase.payload.to.last_ref +
+                block.payload.coinbase.payload.to.address,
+        ];
+        block.payload.txs.forEach((tx) => {
+            keyRefPairs.push(
+                tx.payload.from.last_ref + tx.payload.from.address
+            );
+            const toPairs = tx.payload.to.map((op) => op.last_ref + op.address);
+            keyRefPairs.push(...toPairs);
+        });
+        const keyRefPairSet = new Set(keyRefPairs);
+        if (keyRefPairs.length !== keyRefPairSet.size)
+            throw new Error(
+                "found dupe (last_ref, address) pair within block operations"
+            );
+    }
 
     private verifyNoPriorTxOnAccount(publicKey: string, chain: BlockType[]) {
         for (const block of chain) {
@@ -195,6 +212,8 @@ export class Blockchain implements IBlockchain {
         chain: BlockType[]
     ) {
         this.verifyNoPriorTxOnAccount(txOp.address, chain);
+        if (txOp.operation !== txOp.updated_balance)
+            throw new Error("bad first account tx balance");
     }
 
     private verifyNonNullLastRefOperation(
@@ -210,16 +229,31 @@ export class Blockchain implements IBlockchain {
             refTx,
             txOp.address
         );
-        // if (lastBalance)
+        if (lastBalance + txOp.operation !== txOp.updated_balance)
+            throw new Error("bad account balance update");
+    }
+
+    private verifyOperationSign(
+        txOp: AccountOperationType,
+        type: "from" | "to"
+    ) {
+        if (
+            (txOp.operation < 0 && type === "to") ||
+            (txOp.operation > 0 && type === "from")
+        )
+            throw new Error("bad sign for tx operation field");
     }
 
     private verifyTransaction(tx: AccountTransactionType, chain: BlockType[]) {
         if (tx.payload.from.last_ref === null)
             throw new Error("source account of tx has null last ref");
+        this.verifyNonNullLastRefOperation(tx.payload.from, chain);
+        this.verifyOperationSign(tx.payload.from, "from");
         this.verifyTransactionSignature(tx);
         this.verifyUnicityAcrossDestinationAccountsOfTx(tx);
         this.verifyTransactionOperationsBalance(tx);
         tx.payload.to.forEach((txOp) => {
+            this.verifyOperationSign(txOp, "to");
             if (txOp.last_ref === null) {
                 this.verifyNullLastRefOperation(txOp, chain);
             } else {
@@ -266,6 +300,19 @@ export class Blockchain implements IBlockchain {
         } catch {
             return false;
         }
+    }
+
+    private verifyBlockFullRewardBalance(
+        block: BlockType,
+        setBlockReward: number
+    ) {
+        const coinbaseOperation = block.payload.coinbase.payload.to.operation;
+        const sumFees = block.payload.txs.reduce(
+            (acc, el) => acc + el.payload.miner_fee,
+            0
+        );
+        if (coinbaseOperation !== sumFees + setBlockReward)
+            throw new Error("bad block full reward balance");
     }
 
     getTransactionCtor() {
