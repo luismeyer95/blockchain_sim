@@ -4,6 +4,7 @@ import {
     AccountTransaction,
     AccountTransactionType,
 } from "src/Interfaces/IAccountTransaction";
+import { AccountOperationType } from "src/Interfaces/IAccountOperation";
 import {
     hash,
     verify,
@@ -157,7 +158,7 @@ export class Blockchain implements IBlockchain {
     }
 
     // throws
-    private retrieveLastReferencedBalance(
+    private retrieveLastReferencedTx(
         publicKey: string,
         lastRef: string,
         revChain: BlockType[]
@@ -167,7 +168,7 @@ export class Blockchain implements IBlockchain {
             for (const tx of block.payload.txs) {
                 this.verifyNoDupeLastRefInBlockchainTx(tx, publicKey, lastRef);
                 if (tx.header.signature === lastRef) {
-                    return this.extractBalanceOfAccountFromTx(tx, publicKey);
+                    return tx;
                 }
             }
         }
@@ -189,18 +190,70 @@ export class Blockchain implements IBlockchain {
         }
     }
 
+    private verifyNullLastRefOperation(
+        txOp: AccountOperationType,
+        chain: BlockType[]
+    ) {
+        this.verifyNoPriorTxOnAccount(txOp.address, chain);
+    }
+
+    private verifyNonNullLastRefOperation(
+        txOp: AccountOperationType,
+        chain: BlockType[]
+    ) {
+        const refTx = this.retrieveLastReferencedTx(
+            txOp.address,
+            txOp.last_ref!,
+            chain
+        );
+        const lastBalance = this.extractBalanceOfAccountFromTx(
+            refTx,
+            txOp.address
+        );
+        // if (lastBalance)
+    }
+
     private verifyTransaction(tx: AccountTransactionType, chain: BlockType[]) {
+        if (tx.payload.from.last_ref === null)
+            throw new Error("source account of tx has null last ref");
+        this.verifyTransactionSignature(tx);
+        this.verifyUnicityAcrossDestinationAccountsOfTx(tx);
+        this.verifyTransactionOperationsBalance(tx);
         tx.payload.to.forEach((txOp) => {
             if (txOp.last_ref === null) {
-                this.verifyNoPriorTxOnAccount(txOp.address, chain);
+                this.verifyNullLastRefOperation(txOp, chain);
             } else {
-                const lastBalance = this.retrieveLastReferencedBalance(
-                    txOp.address,
-                    txOp.last_ref,
-                    chain
-                );
+                this.verifyNonNullLastRefOperation(txOp, chain);
             }
         });
+    }
+
+    private verifyTransactionSignature(tx: AccountTransactionType) {
+        const sig = Buffer.from(tx.header.signature, "base64");
+        const fromKey = deserializeKey(tx.payload.from.address, "public");
+        const txPayload = Buffer.from(JSON.stringify(tx.payload));
+        if (!verify(txPayload, fromKey, sig))
+            throw new Error("bad transaction signature");
+    }
+
+    private verifyUnicityAcrossDestinationAccountsOfTx(
+        tx: AccountTransactionType
+    ) {
+        const addressArr = tx.payload.to.map((op) => op.address);
+        const addressSet = new Set(addressArr);
+        if (addressArr.length !== addressSet.size) {
+            throw new Error("duplicate address found in tx output operations");
+        }
+    }
+
+    private verifyTransactionOperationsBalance(tx: AccountTransactionType) {
+        const destBalance = tx.payload.to.reduce(
+            (acc, el) => acc + el.operation,
+            0
+        );
+        const sourceBalance = tx.payload.from.operation;
+        if (sourceBalance + destBalance + tx.payload.miner_fee !== 0)
+            throw new Error("bad transaction balance");
     }
 
     private verifyBlockTransactions(block: BlockType) {

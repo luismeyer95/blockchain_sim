@@ -21,3 +21,5 @@ export const AccountOperationValidator = z.object({
     last_ref: z.string().or(z.null()),
     updated_balance: z.number(),
 });
+
+export type AccountOperationType = z.infer<typeof AccountOperationValidator>;
