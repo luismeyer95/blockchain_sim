@@ -5,7 +5,11 @@ export default interface INodeProtocol {
         respHandler: (data: string) => void
     ): void;
     onBlocksRequest(
-        callback: (range: [number, number], peer: string) => string
+        callback: (
+            range: [number, number],
+            peer: string,
+            respond: (data: string) => void
+        ) => void
     ): void;
 
     broadcast(type: string, data: string): any;
