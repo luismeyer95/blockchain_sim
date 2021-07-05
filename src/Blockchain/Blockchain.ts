@@ -1,9 +1,5 @@
-import { BlockType, Block, IBlock } from "src/Interfaces/IBlock";
-import { IBlockchain } from "src/Interfaces/IBlockchain";
-import {
-    AccountTransaction,
-    AccountTransactionType,
-} from "src/Interfaces/IAccountTransaction";
+import { BlockType } from "src/Interfaces/IBlock";
+import { AccountTransactionType } from "src/Interfaces/IAccountTransaction";
 import { AccountOperationType } from "src/Interfaces/IAccountOperation";
 import {
     hash,
@@ -12,78 +8,117 @@ import {
     deserializeKey,
 } from "src/Encryption/Encryption";
 
-export class Blockchain implements IBlockchain {
-    private chain: BlockType[];
+type BlockRangeValidationResult =
+    | {
+          success: true;
+          chain: BlockType[];
+      }
+    | {
+          success: false;
+          missing: [number, number] | null;
+      };
 
+export class BlockchainChecker {
     constructor() {}
 
-    getLastBlockIndex() {
-        return this.chain.length - 1;
+    isAppendable(chain: BlockType[], block: BlockType) {
+        const rangeFirstIndex = block.payload.index;
+        if (chain.length === 0) return block.payload.index === 0;
+        return chain[chain.length - 1].payload.index + 1 === rangeFirstIndex;
     }
 
-    getBlockRange(range: [number, number]): IBlock[] {
-        const blocks = this.chain.filter(
-            (block) =>
-                block.payload.index >= range[0] &&
-                block.payload.index <= range[1]
-        );
-        return blocks.map((block) => new Block(block));
+    getMissingRange(
+        chain: BlockType[],
+        block: BlockType
+    ): [number, number] | null {
+        if (!this.isAppendable(chain, block)) {
+            const start = chain.length
+                ? chain[chain.length - 1].payload.index
+                : 0;
+            return [start, block.payload.index + 1];
+        }
+        return null;
     }
 
-    private isAppendable(blockArr: IBlock[]) {
-        const rangeFirstIndex = blockArr[0].getBlockIndex();
-        return !(this.getLastBlockIndex() + 1 < rangeFirstIndex);
-    }
-
-    submitBlockRange(blockArr: IBlock[]) {
-        if (blockArr.length === 0)
+    validateBlockRange(
+        chain: BlockType[],
+        blocks: BlockType[]
+    ): BlockRangeValidationResult {
+        if (blocks.length === 0)
             throw new Error("empty block array submission");
+        const missingRange = this.getMissingRange(chain, blocks[0]);
+        if (missingRange) return { success: false, missing: missingRange };
 
-        const backupChain = this.chain.slice();
+        const resultChain = chain.filter(
+            (block) => block.payload.index < blocks[0].payload.index
+        );
         try {
-            blockArr.forEach((block) => {
-                this.tryAddBlock(block.pure() as BlockType);
+            blocks.forEach((block) => {
+                this.tryAddBlock(resultChain, block);
             });
         } catch {
-            this.chain = backupChain;
-            return false;
+            return { success: false, missing: null };
         }
-        return true;
+        return {
+            success: true,
+            chain: resultChain,
+        };
     }
 
-    private tryAddBlock(block: BlockType) {
-        const blockIndex = block.payload.index;
-        if (this.getLastBlockIndex() + 1 < blockIndex)
-            throw new Error("missing blocks");
-        // return missing block detail instead of throwing
+    private tryAddBlock(chain: BlockType[], block: BlockType) {
+        this.verifyBlock(chain, block);
+        chain[block.payload.index] = block;
     }
 
-    private verifyBlockIndexContinuity(block: BlockType): boolean {
-        const blockIndex = block.payload.index;
-        return !(this.getLastBlockIndex() + 1 < blockIndex);
+    private verifyBlock(chain: BlockType[], block: BlockType) {
+        const revChain = this.getReverseChain(chain, block.payload.index);
+
+        // TODO: REMOVE HARDCODED COMPLEXITY!!
+        this.verifyBlockPayloadHash(block, 23);
+        this.verifyIncludedPrevBlockHash(chain, block);
+        this.verifyBlockCoinbaseSignature(block);
+        this.verifyBlockTimestamps(chain, block);
+        this.verifyNoDupeRefWithinBlock(block);
+        this.verifyOperationRef(block.payload.coinbase.payload.to, revChain);
+        this.verifyBlockTransactions(block, revChain);
+        // TODO: REMOVE HARDCODED BLOCK REWARD!!
+        this.verifyBlockFullRewardBalance(block, 10);
     }
 
-    private verifyBlockPayloadHash(
-        block: BlockType,
-        complexity: number
-    ): boolean {
+    private verifyOperationRef(
+        txOp: AccountOperationType,
+        revChain: BlockType[]
+    ) {
+        if (txOp.last_ref === null)
+            this.verifyNullLastRefOperation(txOp, revChain);
+        else this.verifyNonNullLastRefOperation(txOp, revChain);
+    }
+
+    // private verifyBlockIndexContinuity(block: BlockType): boolean {
+    //     const blockIndex = block.payload.index;
+    //     return !(this.getLastBlockIndex() + 1 < blockIndex);
+    // }
+
+    private verifyBlockPayloadHash(block: BlockType, complexity: number) {
         const payloadString = JSON.stringify(block.payload);
         const hashed = hash(Buffer.from(payloadString));
         const base64hash = hashed.digest("base64");
         const isGold = hashSatisfiesComplexity(payloadString, complexity);
-        return isGold.success && base64hash === block.header.hash;
+        if (!isGold.success || base64hash !== block.header.hash)
+            throw new Error("bad block hash");
     }
 
-    private verifyIncludedPrevBlockHash(block: BlockType): boolean {
+    private verifyIncludedPrevBlockHash(chain: BlockType[], block: BlockType) {
         const prevHash = block.payload.previous_hash;
         const blockIndex = block.payload.index;
         if (blockIndex === 0) {
-            return prevHash === null;
+            if (prevHash !== null) throw new Error("bad previous block hash");
         } else {
-            const prevBlock = this.getPreviousBlock(block);
+            const prevBlock = this.getPreviousBlock(chain, block);
             if (prevBlock) {
                 const localPrevHash = prevBlock.header.hash;
-                return prevHash === localPrevHash;
+                if (prevHash !== localPrevHash)
+                    throw new Error("bad previous block hash");
             } else {
                 throw new Error("error: did not check for block continuity");
                 // should NOT happen
@@ -91,8 +126,8 @@ export class Blockchain implements IBlockchain {
         }
     }
 
-    private verifyBlockTimestamps(block: BlockType) {
-        const prevBlock = this.getPreviousBlock(block);
+    private verifyBlockTimestamps(chain: BlockType[], block: BlockType) {
+        const prevBlock = this.getPreviousBlock(chain, block);
         if (prevBlock) {
             const blockCheck =
                 prevBlock.payload.timestamp < block.payload.timestamp &&
@@ -101,15 +136,19 @@ export class Blockchain implements IBlockchain {
             const coinbaseCheck =
                 prevBlock.payload.timestamp < coinbaseTimestamp &&
                 coinbaseTimestamp < Date.now();
-            return blockCheck && coinbaseCheck;
+            if (!blockCheck || !coinbaseCheck)
+                throw new Error("bad block timestamps");
         }
         throw new Error("error: did not check for block continuity");
     }
 
-    private getPreviousBlock(block: BlockType): BlockType | null {
+    private getPreviousBlock(
+        chain: BlockType[],
+        block: BlockType
+    ): BlockType | null {
         const blockIndex = block.payload.index;
-        if (blockIndex === 0 || this.chain.length < blockIndex) return null;
-        return this.chain[blockIndex - 1];
+        if (blockIndex === 0 || chain.length < blockIndex) return null;
+        return chain[blockIndex - 1];
     }
 
     private verifyBlockCoinbaseSignature(block: BlockType) {
@@ -124,7 +163,8 @@ export class Blockchain implements IBlockchain {
         const coinbasePayload = Buffer.from(
             JSON.stringify(block.payload.coinbase.payload)
         );
-        return verify(coinbasePayload, publicKeyMiner, coinbaseSig);
+        if (!verify(coinbasePayload, publicKeyMiner, coinbaseSig))
+            throw new Error("bad block coinbase signature");
     }
 
     private verifyNoDupeLastRefInBlockchainTx(
@@ -150,8 +190,8 @@ export class Blockchain implements IBlockchain {
         return output.updated_balance;
     }
 
-    private getReverseChain(stopIndex: number) {
-        return this.chain
+    private getReverseChain(chain: BlockType[], stopIndex: number) {
+        return chain
             .slice()
             .filter((block) => block.payload.index < stopIndex)
             .reverse();
@@ -163,8 +203,7 @@ export class Blockchain implements IBlockchain {
         lastRef: string,
         revChain: BlockType[]
     ) {
-        const chain = revChain;
-        for (const block of chain) {
+        for (const block of revChain) {
             for (const tx of block.payload.txs) {
                 this.verifyNoDupeLastRefInBlockchainTx(tx, publicKey, lastRef);
                 if (tx.header.signature === lastRef) {
@@ -194,8 +233,8 @@ export class Blockchain implements IBlockchain {
             );
     }
 
-    private verifyNoPriorTxOnAccount(publicKey: string, chain: BlockType[]) {
-        for (const block of chain) {
+    private verifyNoPriorTxOnAccount(publicKey: string, revChain: BlockType[]) {
+        for (const block of revChain) {
             if (block.payload.coinbase.payload.to.address === publicKey)
                 throw new Error("found prior tx on account");
             for (const tx of block.payload.txs) {
@@ -209,21 +248,21 @@ export class Blockchain implements IBlockchain {
 
     private verifyNullLastRefOperation(
         txOp: AccountOperationType,
-        chain: BlockType[]
+        revChain: BlockType[]
     ) {
-        this.verifyNoPriorTxOnAccount(txOp.address, chain);
+        this.verifyNoPriorTxOnAccount(txOp.address, revChain);
         if (txOp.operation !== txOp.updated_balance)
             throw new Error("bad first account tx balance");
     }
 
     private verifyNonNullLastRefOperation(
         txOp: AccountOperationType,
-        chain: BlockType[]
+        revChain: BlockType[]
     ) {
         const refTx = this.retrieveLastReferencedTx(
             txOp.address,
             txOp.last_ref!,
-            chain
+            revChain
         );
         const lastBalance = this.extractBalanceOfAccountFromTx(
             refTx,
@@ -244,10 +283,13 @@ export class Blockchain implements IBlockchain {
             throw new Error("bad sign for tx operation field");
     }
 
-    private verifyTransaction(tx: AccountTransactionType, chain: BlockType[]) {
+    private verifyTransaction(
+        tx: AccountTransactionType,
+        revChain: BlockType[]
+    ) {
         if (tx.payload.from.last_ref === null)
             throw new Error("source account of tx has null last ref");
-        this.verifyNonNullLastRefOperation(tx.payload.from, chain);
+        this.verifyNonNullLastRefOperation(tx.payload.from, revChain);
         this.verifyOperationSign(tx.payload.from, "from");
         this.verifyTransactionSignature(tx);
         this.verifyUnicityAcrossDestinationAccountsOfTx(tx);
@@ -255,9 +297,9 @@ export class Blockchain implements IBlockchain {
         tx.payload.to.forEach((txOp) => {
             this.verifyOperationSign(txOp, "to");
             if (txOp.last_ref === null) {
-                this.verifyNullLastRefOperation(txOp, chain);
+                this.verifyNullLastRefOperation(txOp, revChain);
             } else {
-                this.verifyNonNullLastRefOperation(txOp, chain);
+                this.verifyNonNullLastRefOperation(txOp, revChain);
             }
         });
     }
@@ -290,15 +332,9 @@ export class Blockchain implements IBlockchain {
             throw new Error("bad transaction balance");
     }
 
-    private verifyBlockTransactions(block: BlockType) {
-        const chain = this.getReverseChain(this.chain.length);
-        try {
-            for (const tx of block.payload.txs) {
-                this.verifyTransaction(tx, chain);
-            }
-            return true;
-        } catch {
-            return false;
+    private verifyBlockTransactions(block: BlockType, revChain: BlockType[]) {
+        for (const tx of block.payload.txs) {
+            this.verifyTransaction(tx, revChain);
         }
     }
 
@@ -313,13 +349,5 @@ export class Blockchain implements IBlockchain {
         );
         if (coinbaseOperation !== sumFees + setBlockReward)
             throw new Error("bad block full reward balance");
-    }
-
-    getTransactionCtor() {
-        return AccountTransaction;
-    }
-
-    getBlockCtor() {
-        return Block;
     }
 }

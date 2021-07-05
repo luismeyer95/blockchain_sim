@@ -33,28 +33,28 @@ export type AccountTransactionType = z.infer<
     typeof AccountTransactionValidator
 >;
 
-export interface IAccountTransaction {
-    getTimestamp: () => number;
-}
+// export interface IAccountTransaction {
+//     getTimestamp: () => number;
+// }
 
-export interface AccountTransactionCtor {
-    new (serial: string): IAccountTransaction;
-}
+// export interface AccountTransactionCtor {
+//     new (serial: string): IAccountTransaction;
+// }
 
-export class AccountTransaction implements IAccountTransaction {
-    private tx: AccountTransactionType;
+// export class AccountTransaction implements IAccountTransaction {
+//     private tx: AccountTransactionType;
 
-    constructor(serial: string) {
-        const obj = JSON.parse(serial);
-        const txValidation = AccountTransactionValidator.safeParse(obj);
-        if (txValidation.success) {
-            this.tx = txValidation.data;
-        } else {
-            throw new Error("data shape error");
-        }
-    }
+//     constructor(serial: string) {
+//         const obj = JSON.parse(serial);
+//         const txValidation = AccountTransactionValidator.safeParse(obj);
+//         if (txValidation.success) {
+//             this.tx = txValidation.data;
+//         } else {
+//             throw new Error("data shape error");
+//         }
+//     }
 
-    getTimestamp() {
-        return this.tx.payload.timestamp;
-    }
-}
+//     getTimestamp() {
+//         return this.tx.payload.timestamp;
+//     }
+// }

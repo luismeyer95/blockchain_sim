@@ -1,8 +1,4 @@
-import {
-    AccountTransactionValidator,
-    AccountTransactionCtor,
-    AccountTransaction,
-} from "./IAccountTransaction";
+import { AccountTransactionValidator } from "./IAccountTransaction";
 import { CoinbaseTransactionValidator } from "./ICoinbaseTransaction";
 
 import { z } from "zod";
@@ -42,47 +38,3 @@ export const BlockValidator = z.object({
 });
 
 export type BlockType = z.infer<typeof BlockValidator>;
-
-export interface IBlock {
-    getBlockIndex: () => number;
-    getTimestamp: () => number;
-
-    // returns the pure data object, stripped of methods
-    pure: () => unknown;
-
-    getTransactionCtor: () => AccountTransactionCtor;
-}
-
-export interface BlockCtor {
-    new (serial: string): IBlock;
-}
-
-export class Block implements IBlock {
-    private block: BlockType;
-
-    constructor(input: string | BlockType) {
-        const obj = typeof input === "string" ? JSON.parse(input) : input;
-        const blockValidation = BlockValidator.safeParse(obj);
-        if (blockValidation.success) {
-            this.block = blockValidation.data;
-        } else {
-            throw new Error("data shape error");
-        }
-    }
-
-    getBlockIndex() {
-        return this.block.payload.index;
-    }
-
-    getTimestamp() {
-        return this.block.payload.timestamp;
-    }
-
-    getTransactionCtor() {
-        return AccountTransaction;
-    }
-
-    pure() {
-        return this.block;
-    }
-}

@@ -1,10 +1,12 @@
 export default interface INodeProtocol {
-    request(
-        type: string,
+    requestBlocks(
+        range: [number, number],
         peer: string,
         respHandler: (data: string) => void
     ): void;
-    onRequest(type: string, callback: (peer: string) => string): void;
+    onBlocksRequest(
+        callback: (range: [number, number], peer: string) => string
+    ): void;
 
     broadcast(type: string, data: string): any;
     onBroadcast(
