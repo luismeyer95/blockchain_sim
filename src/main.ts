@@ -1,26 +1,18 @@
-import net from "net";
 import { NodeNet } from "src/Net/NodeNet";
-import INodeNet from "src/Interfaces/INodeNet";
-import ndjson from "ndjson";
+import { NodeProtocol } from "src/Protocol/NodeProtocol";
+import INodeProtocol from "src/Interfaces/INodeProtocol";
+import { log } from "./Logger/Loggers";
+import { stdin } from "process";
 
-const nodenet = new NodeNet((data) => {
-    process.stdout.write(data);
-});
-nodenet.receive((peer, data) => {
-    nodenet.send(peer, "OK!");
-});
+const ptcl: INodeProtocol = new NodeProtocol(log, new NodeNet(log));
 
-setTimeout(() => {
-    nodenet.broadcast(`hello from ${nodenet.id} !`);
-}, 1000);
-
-////
-
-const netnode = new NodeNet(console.log);
-netnode.receive((peer, data) => {
-    netnode.send(peer, "AIGHT!");
+ptcl.onBroadcast("cock", (data, peer, relay) => {
+    if (data.trim() === "pussy") {
+        console.log("relayed!");
+        relay();
+    }
 });
 
-setTimeout(() => {
-    netnode.broadcast(`hola from ${netnode.id} !`);
-}, 1000);
+stdin.on("data", (buf: Buffer) => {
+    ptcl.broadcast("cock", buf.toString());
+});

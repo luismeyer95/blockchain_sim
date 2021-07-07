@@ -9,8 +9,8 @@ import ILogger from "src/Logger/ILogger";
 import { log } from "src/Logger/Loggers";
 import { v4 as generateUUID } from "uuid";
 import { z } from "zod";
-import eos from "end-of-stream";
 import jsonStream, { JSONSocket } from "duplex-json-stream";
+import { hash } from "src/Encryption/Encryption";
 
 function IdToAddress(name: string) {
     return name + ".local:" + toPort(name);
@@ -27,7 +27,7 @@ const PeerTableInfo = z.object({
 });
 
 const Payload = z.object({
-    payload: z.any().refine((p) => p !== undefined),
+    payload: z.string(),
 });
 
 type PeerTableInfo = z.infer<typeof PeerTableInfo>;
@@ -35,8 +35,8 @@ type Payload = z.infer<typeof Payload>;
 
 class PeerSet extends EventEmitter {
     public peers: {
-        id: string;
-        socket: Socket;
+        addr: string;
+        socket: JSONSocket;
     }[] = [];
 
     constructor() {
@@ -44,46 +44,48 @@ class PeerSet extends EventEmitter {
         this.peers = [];
     }
 
-    has(stream: Socket) {
+    has(stream: JSONSocket) {
         const found = this.peers.find((peer) => peer.socket === stream);
         return !!found;
     }
 
-    get(handle: Socket | string) {
+    get(handle: JSONSocket | string) {
         if (typeof handle === "string")
-            return this.peers.find((peer) => peer.id === handle);
+            return this.peers.find((peer) => peer.addr === handle);
         return this.peers.find((peer) => peer.socket === handle);
     }
 
-    forEach(fn: (peer: { socket: Socket; id: string }) => any) {
+    forEach(fn: (peer: { socket: JSONSocket; addr: string }) => any) {
         this.peers.forEach(fn);
     }
 
-    remove(stream: Socket) {
+    rm(stream: JSONSocket) {
         const found = this.peers.find((peer) => peer.socket === stream);
         if (!found) return;
         const index = this.peers.indexOf(found);
         this.peers.splice(index, 1);
-        this.emit("remove", stream);
+        this.emit("remove", found);
     }
 
-    add(socket: Socket, id: string) {
+    add(socket: JSONSocket, addr: string) {
         if (this.has(socket)) return socket;
-        this.peers.push({ socket, id });
-        eos(socket, () => {
-            this.remove(socket);
+        const peer = { socket, addr };
+        this.peers.push(peer);
+        socket.on("close", () => {
+            this.rm(socket);
         });
-        this.emit("add", socket);
+        this.emit("add", peer);
         return socket;
     }
 }
 
 export class NodeNet extends EventEmitter implements INodeNet {
     public id: string;
-    public peerIds: string[] = [];
+    public peerTable: string[] = [];
     public swarm: Topology;
     // public streams: StreamSet;
     public peers: PeerSet;
+    private msgCache: Set<string> = new Set<string>();
 
     private defaultId: string = "default";
 
@@ -98,37 +100,6 @@ export class NodeNet extends EventEmitter implements INodeNet {
             this.tryListen(generateUUID(), [this.defaultId], fallback);
         };
         this.tryListen(this.defaultId, [], fallback);
-    }
-
-    broadcast(message: string): void {
-        const netMessage: Payload = {
-            payload: message,
-        };
-        this.peers.forEach(({ socket }) => {
-            socket.write(JSON.stringify(netMessage));
-        });
-    }
-
-    send(peer: string, data: string): void {
-        const foundPeer = this.peers.get(peer);
-        if (foundPeer) {
-            const netMessage: Payload = {
-                payload: data,
-            };
-            foundPeer.socket.write(JSON.stringify(netMessage));
-        } else {
-            throw new Error(
-                "NodeNet.send(): peer id not matching to any entry"
-            );
-        }
-    }
-
-    receive(callback: (peer: string, data: string) => void): void {
-        this.on("payload", callback);
-    }
-
-    public shortenId(id: string) {
-        return id.slice(0, this.defaultId.length);
     }
 
     private tryListen(id: string, peerIds: string[], fallback?: () => void) {
@@ -152,72 +123,63 @@ export class NodeNet extends EventEmitter implements INodeNet {
     }
 
     private onConnection(newPeer: Socket, peerAddress: string) {
-        const jsons = jsonStream(newPeer);
-
         this.emit("connection");
-        const shid = this.shortenId(addressToId(peerAddress));
+        const shid = this.shortenAddr(peerAddress);
         this.log(`[${shid} joined]\n`);
 
         // add comm socket to set
         // this.streams.add(newPeer);
-        this.peers.add(newPeer, peerAddress);
+        const jsonPeer = jsonStream(newPeer);
+        this.peers.add(jsonPeer, peerAddress);
 
-        this.updatePeerTable(peerAddress);
-        this.sendPeerTable(newPeer);
-        this.subscribeToPeerEvents(newPeer, peerAddress);
+        if (this.isUnknownPeer(peerAddress)) this.peerTable.push(peerAddress);
+        this.sendPeerTable(jsonPeer);
+        this.subscribeToPeerEvents(jsonPeer, peerAddress);
     }
 
-    private subscribeToPeerEvents(newPeer: Socket, peerAddress: string) {
-        const shid = this.shortenId(addressToId(peerAddress));
+    private isUnknownPeer = (peerAddress: string): boolean => {
+        return !this.peerTable.find(
+            (addr) => addr === peerAddress && addr !== IdToAddress(this.id)
+        );
+    };
 
-        newPeer.on("data", (data: Buffer) => {
+    private sendPeerTable(peer: JSONSocket) {
+        const peerTableMsg: PeerTableInfo = {
+            peer: {
+                table: this.peerTable,
+            },
+        };
+        peer.write(peerTableMsg);
+    }
+
+    private subscribeToPeerEvents(jsonPeer: JSONSocket, peerAddress: string) {
+        const shid = this.shortenAddr(peerAddress);
+
+        jsonPeer.on("data", (obj: unknown) => {
             this.log(`[received data from peer ${shid}]\n`);
-            const strdata: string = data.toString();
-            console.log("BRUH", strdata, "BRUH");
-            const obj: unknown = JSON.parse(strdata);
             this.processMessageNetworkInfo(obj, peerAddress);
             this.processPayload(obj, peerAddress);
         });
-        newPeer.on("close", () => {
-            this.peerIds = this.peerIds.filter(
-                (id) => IdToAddress(id) !== peerAddress
-            );
+
+        jsonPeer.on("close", () => {
+            this.log(`[disconnect: ${shid}]\n`);
         });
-    }
-
-    private updatePeerTable(peerAddress: string) {
-        // add string id of peer only if it's not already there and not my id
-        const peerId = addressToId(peerAddress);
-        if (!this.peerIds.find((id) => id === peerId))
-            this.peerIds.push(peerId);
-    }
-
-    private sendPeerTable(peer: Socket) {
-        const peerTableMsg: PeerTableInfo = {
-            peer: {
-                table: this.peerIds,
-            },
-        };
-        peer.write(JSON.stringify(peerTableMsg));
     }
 
     private processMessageNetworkInfo(obj: unknown, peerAddress: string) {
         let netValidation = PeerTableInfo.safeParse(obj);
 
         if (netValidation.success) {
-            const shid = this.shortenId(addressToId(peerAddress));
+            const shid = this.shortenAddr(peerAddress);
             this.log(`[received ${shid}'s peer table]\n`);
             const table = netValidation.data.peer.table;
             // only keep received table entries that are not in my table and
             // that don't reference myself
-            const unknownPeers = table.filter(
-                (peerId: string) =>
-                    !this.peerIds.includes(peerId) && peerId !== this.id
-            );
-            unknownPeers.forEach((peerId: string) => {
-                this.peerIds.push(peerId);
-                this.log(`[adding ${this.shortenId(peerId)} to swarm]\n`);
-                this.swarm.add(IdToAddress(peerId));
+            const unknownPeers = table.filter(this.isUnknownPeer);
+            unknownPeers.forEach((addr: string) => {
+                this.peerTable.push(addr);
+                this.swarm.add(addr);
+                this.log(`[adding ${this.shortenAddr(addr)} to swarm]\n`);
             });
         }
     }
@@ -225,7 +187,56 @@ export class NodeNet extends EventEmitter implements INodeNet {
     private processPayload(obj: unknown, peerAddress: string) {
         let payloadValidation = Payload.safeParse(obj);
         if (payloadValidation.success) {
-            this.emit("payload", peerAddress, payloadValidation.data.payload);
+            const payload = payloadValidation.data.payload;
+
+            const payloadHash = hash(Buffer.from(payload))
+                .digest()
+                .toString("base64");
+            if (this.msgCache.has(payloadHash)) return;
+            this.msgCache.add(payloadHash);
+            setTimeout(() => {
+                this.msgCache.delete(payloadHash);
+            }, 60 * 1000);
+
+            this.emit("payload", peerAddress, payload);
         }
+    }
+
+    broadcast(message: string): void {
+        const netMessage: Payload = {
+            payload: message,
+        };
+
+        const payloadHash = hash(Buffer.from(message))
+            .digest()
+            .toString("base64");
+        this.msgCache.add(payloadHash);
+
+        this.peers.forEach(({ socket }) => {
+            socket.write(netMessage);
+        });
+    }
+
+    send(peer: string, data: string): void {
+        const foundPeer = this.peers.get(peer);
+        if (foundPeer) {
+            const netMessage: Payload = {
+                payload: data,
+            };
+            foundPeer.socket.write(netMessage);
+        } else {
+            throw new Error(
+                "NodeNet.send(): peer id not matching to any entry"
+            );
+        }
+    }
+
+    receive(callback: (peer: string, data: string) => void): void {
+        this.on("payload", callback);
+    }
+
+    public shortenAddr(addr: string) {
+        const id = addressToId(addr);
+        return id.slice(0, this.defaultId.length);
     }
 }

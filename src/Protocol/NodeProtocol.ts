@@ -39,6 +39,15 @@ export class NodeProtocol implements INodeProtocol {
     private net: INodeNet;
     private events: EventEmitter;
 
+    constructor(logger: ILogger, net: INodeNet) {
+        this.log = logger;
+        this.net = net;
+        this.events = new EventEmitter();
+        this.net.receive((peer, data) => {
+            this.dispatchByValidation(peer, data);
+        });
+    }
+
     private validationMap: [z.ZodAny, (peer: string, obj: unknown) => any][] = [
         [BlocksRequestValidator, this.handleBlocksRequest.bind(this)],
         [BlocksResponseValidator, this.handleBlocksResponse.bind(this)],
@@ -89,18 +98,15 @@ export class NodeProtocol implements INodeProtocol {
 
     private handleBroadcast(peer: string, obj: unknown) {
         const message = obj as BroadcastType;
+        const relayHook = () => {
+            this.net.broadcast(JSON.stringify(message));
+        };
         this.events.emit(
             `${message.data_type} broadcast`,
             message.payload,
-            peer
+            peer,
+            relayHook
         );
-    }
-
-    constructor(logger: ILogger, net: INodeNet) {
-        this.log = logger;
-        this.net.receive((peer, data) => {
-            this.dispatchByValidation(peer, data);
-        });
     }
 
     requestBlocks(
@@ -142,7 +148,7 @@ export class NodeProtocol implements INodeProtocol {
 
     onBroadcast(
         type: string,
-        callback: (data: string, peer: string) => void
+        callback: (data: string, peer: string, relay: () => void) => void
     ): void {
         this.events.on(`${type} broadcast`, callback);
     }

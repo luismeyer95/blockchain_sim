@@ -15,6 +15,6 @@ export default interface INodeProtocol {
     broadcast(type: string, data: string): any;
     onBroadcast(
         type: string,
-        callback: (data: string, peer: string) => void
+        callback: (data: string, peer: string, relay: () => void) => void
     ): void;
 }
