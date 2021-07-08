@@ -1,12 +1,17 @@
-import { BlockType } from "src/Interfaces/IBlock";
-import { AccountTransactionType } from "src/Interfaces/IAccountTransaction";
-import { AccountOperationType } from "src/Interfaces/IAccountOperation";
+import { BlockType } from "src/BlockchainDataFactory/IBlock";
+import { AccountTransactionType } from "src/BlockchainDataFactory/IAccountTransaction";
+import { AccountOperationType } from "src/BlockchainDataFactory/IAccountOperation";
 import {
     hash,
     verify,
     hashSatisfiesComplexity,
     deserializeKey,
+    serializeKey,
+    sign,
 } from "src/Encryption/Encryption";
+import IBlockchainChecker from "src/Interfaces/IBlockchainChecker";
+import { last } from "lodash";
+import { KeyObject } from "crypto";
 
 type BlockRangeValidationResult =
     | {
@@ -18,27 +23,28 @@ type BlockRangeValidationResult =
           missing: [number, number] | null;
       };
 
-export class BlockchainChecker {
+type TransactionValidationResult =
+    | {
+          success: true;
+      }
+    | {
+          success: false;
+          message: string;
+      };
+
+type TransactionInfo = {
+    from: {
+        address: KeyObject;
+    };
+    to: Array<{
+        address: KeyObject;
+        amount: number;
+    }>;
+    fee: number;
+};
+
+export class BlockchainChecker implements IBlockchainChecker {
     constructor() {}
-
-    isAppendable(chain: BlockType[], block: BlockType) {
-        const rangeFirstIndex = block.payload.index;
-        if (chain.length === 0) return block.payload.index === 0;
-        return chain[chain.length - 1].payload.index + 1 === rangeFirstIndex;
-    }
-
-    getMissingRange(
-        chain: BlockType[],
-        block: BlockType
-    ): [number, number] | null {
-        if (!this.isAppendable(chain, block)) {
-            const start = chain.length
-                ? chain[chain.length - 1].payload.index
-                : 0;
-            return [start, block.payload.index + 1];
-        }
-        return null;
-    }
 
     validateBlockRange(
         chain: BlockType[],
@@ -63,6 +69,93 @@ export class BlockchainChecker {
             success: true,
             chain: resultChain,
         };
+    }
+
+    validateTransaction(
+        chain: BlockType[],
+        tx: AccountTransactionType
+    ): TransactionValidationResult {
+        const revChain = this.getReverseChain(chain);
+        try {
+            this.verifyTransaction(tx, revChain);
+        } catch (err) {
+            return {
+                success: false,
+                message: err.message,
+            };
+        }
+        return { success: true };
+    }
+
+    // verify sum(to[].amount) + fee against account funds
+    createTransaction(
+        chain: BlockType[],
+        info: TransactionInfo,
+        privateKey: KeyObject
+    ): AccountTransactionType {
+        const revChain = this.getReverseChain(chain);
+        const destOperations: AccountOperationType[] = info.to.map((destOp) => {
+            const serializedAddress = serializeKey(destOp.address);
+            const { op: lastOp, ref } = this.retrieveLastAccountOperation(
+                serializedAddress,
+                revChain
+            );
+            return {
+                address: serializedAddress,
+                operation: destOp.amount,
+                last_ref: ref,
+                updated_balance: lastOp.updated_balance + destOp.amount,
+            };
+        });
+        const serializedFromAddress = serializeKey(info.from.address);
+        const { op: lastOp, ref } = this.retrieveLastAccountOperation(
+            serializedFromAddress,
+            revChain
+        );
+        const fromMovement =
+            destOperations.reduce((acc, el) => acc - el.operation, 0) -
+            info.fee;
+        const fromOperation: AccountOperationType = {
+            address: serializedFromAddress,
+            operation: fromMovement,
+            last_ref: ref,
+            updated_balance: lastOp.updated_balance + fromMovement,
+        };
+        const txPayload = {
+            from: fromOperation,
+            to: destOperations,
+            miner_fee: info.fee,
+            timestamp: Date.now(),
+        };
+        const txPayloadBuffer = Buffer.from(JSON.stringify(txPayload));
+
+        const tx: AccountTransactionType = {
+            header: {
+                signature: sign(txPayloadBuffer, privateKey).toString("base64"),
+            },
+            payload: txPayload,
+        };
+        this.verifyTransaction(tx, revChain);
+        return tx;
+    }
+
+    private isAppendable(chain: BlockType[], block: BlockType) {
+        const rangeFirstIndex = block.payload.index;
+        if (chain.length === 0) return block.payload.index === 0;
+        return chain[chain.length - 1].payload.index + 1 === rangeFirstIndex;
+    }
+
+    private getMissingRange(
+        chain: BlockType[],
+        block: BlockType
+    ): [number, number] | null {
+        if (!this.isAppendable(chain, block)) {
+            const start = chain.length
+                ? chain[chain.length - 1].payload.index
+                : 0;
+            return [start, block.payload.index + 1];
+        }
+        return null;
     }
 
     private tryAddBlock(chain: BlockType[], block: BlockType) {
@@ -93,11 +186,6 @@ export class BlockchainChecker {
             this.verifyNullLastRefOperation(txOp, revChain);
         else this.verifyNonNullLastRefOperation(txOp, revChain);
     }
-
-    // private verifyBlockIndexContinuity(block: BlockType): boolean {
-    //     const blockIndex = block.payload.index;
-    //     return !(this.getLastBlockIndex() + 1 < blockIndex);
-    // }
 
     private verifyBlockPayloadHash(block: BlockType, complexity: number) {
         const payloadString = JSON.stringify(block.payload);
@@ -166,6 +254,18 @@ export class BlockchainChecker {
         if (!verify(coinbasePayload, publicKeyMiner, coinbaseSig))
             throw new Error("bad block coinbase signature");
     }
+    // throws
+    private verifyLastRefNotAlreadyReferenced(
+        publicKey: string,
+        lastRef: string,
+        revChain: BlockType[]
+    ) {
+        for (const block of revChain) {
+            for (const tx of block.payload.txs) {
+                this.verifyNoDupeLastRefInBlockchainTx(tx, publicKey, lastRef);
+            }
+        }
+    }
 
     private verifyNoDupeLastRefInBlockchainTx(
         tx: AccountTransactionType,
@@ -178,40 +278,37 @@ export class BlockchainChecker {
         });
     }
 
-    private extractBalanceOfAccountFromTx(
-        tx: AccountTransactionType,
-        publicKey: string
+    private getReverseChain(
+        chain: BlockType[],
+        stopIndex: number = chain.length
     ) {
-        const output = tx.payload.to.find((op) => op.address === publicKey);
-        if (!output)
-            throw new Error(
-                "reference exists but no output for given address was found"
-            );
-        return output.updated_balance;
-    }
-
-    private getReverseChain(chain: BlockType[], stopIndex: number) {
         return chain
             .slice()
             .filter((block) => block.payload.index < stopIndex)
             .reverse();
     }
 
-    // throws
-    private retrieveLastReferencedTx(
+    private retrieveLastAccountOperation(
         publicKey: string,
-        lastRef: string,
         revChain: BlockType[]
-    ) {
+    ): {
+        op: IAccountOperation;
+        ref: string;
+    } {
         for (const block of revChain) {
+            if (block.payload.coinbase.payload.to.address === publicKey)
+                return {
+                    op: block.payload.coinbase.payload.to,
+                    ref: block.payload.coinbase.header.signature,
+                };
             for (const tx of block.payload.txs) {
-                this.verifyNoDupeLastRefInBlockchainTx(tx, publicKey, lastRef);
-                if (tx.header.signature === lastRef) {
-                    return tx;
+                for (const output of tx.payload.to) {
+                    if (output.address === publicKey)
+                        return { op: output, ref: tx.header.signature };
                 }
             }
         }
-        throw new Error("last reference not found");
+        throw new Error("last account tx not found");
     }
 
     private verifyNoDupeRefWithinBlock(block: BlockType) {
@@ -259,16 +356,17 @@ export class BlockchainChecker {
         txOp: AccountOperationType,
         revChain: BlockType[]
     ) {
-        const refTx = this.retrieveLastReferencedTx(
+        this.verifyLastRefNotAlreadyReferenced(
             txOp.address,
             txOp.last_ref!,
             revChain
         );
-        const lastBalance = this.extractBalanceOfAccountFromTx(
-            refTx,
-            txOp.address
+        const { op: lastOp, ref } = this.retrieveLastAccountOperation(
+            txOp.address,
+            revChain
         );
-        if (lastBalance + txOp.operation !== txOp.updated_balance)
+        if (ref !== txOp.last_ref) throw new Error("bad last ref");
+        if (lastOp.updated_balance + txOp.operation !== txOp.updated_balance)
             throw new Error("bad account balance update");
     }
 
@@ -294,6 +392,7 @@ export class BlockchainChecker {
         this.verifyTransactionSignature(tx);
         this.verifyUnicityAcrossDestinationAccountsOfTx(tx);
         this.verifyTransactionOperationsBalance(tx);
+        this.verifyNoNegativeBalanceInTransaction(tx);
         tx.payload.to.forEach((txOp) => {
             this.verifyOperationSign(txOp, "to");
             if (txOp.last_ref === null) {
@@ -330,6 +429,14 @@ export class BlockchainChecker {
         const sourceBalance = tx.payload.from.operation;
         if (sourceBalance + destBalance + tx.payload.miner_fee !== 0)
             throw new Error("bad transaction balance");
+    }
+
+    private verifyNoNegativeBalanceInTransaction(tx: AccountTransactionType) {
+        const err = new Error("negative balance for transaction");
+        tx.payload.to.forEach((op) => {
+            if (op.updated_balance < 0) throw err;
+        });
+        if (tx.payload.from.updated_balance < 0) throw err;
     }
 
     private verifyBlockTransactions(block: BlockType, revChain: BlockType[]) {
