@@ -1,8 +1,12 @@
-import { isNonceGold } from "src/Encryption/Encryption";
 import { z } from "zod";
+import { BlockType, BlockValidator } from "./IBlock";
+import {
+    hashSatisfiesComplexity,
+    serializeKey,
+} from "src/Encryption/Encryption";
 
 const ParentProcessMessage = z.object({
-    data: z.string(),
+    data: BlockValidator,
     complexity: z.number().refine((c) => {
         return c >= 0 && c <= 32;
     }),
@@ -11,7 +15,7 @@ const ParentProcessMessage = z.object({
 export type ParentProcessMessage = z.infer<typeof ParentProcessMessage>;
 
 let nonce: number = 0;
-let currentData: string | null = null;
+let currentData: BlockType | null = null;
 let complexity: number = 32;
 
 process.on("message", (msg: string) => {
@@ -34,8 +38,10 @@ setInterval(() => {
 
 function mine() {
     if (currentData) {
-        const checkNonce = isNonceGold(nonce, currentData, complexity);
-        if (checkNonce.success) {
+        currentData.payload.nonce = nonce;
+        const serializedBlock = JSON.stringify(currentData);
+        const check = hashSatisfiesComplexity(serializedBlock, complexity);
+        if (check.success) {
             sendProof();
             currentData = null;
         } else {
