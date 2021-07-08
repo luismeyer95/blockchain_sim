@@ -4,17 +4,17 @@ import {
     AccountTransactionValidator,
     AccountTransactionType,
 } from "src/BlockchainDataFactory/IAccountTransaction";
-import { BlockchainChecker } from "src/BlockchainDataFactory/BlockchainChecker";
+import { BlockchainOperator } from "src/BlockchainDataFactory/BlockchainOperator";
 import { z } from "zod";
 import ILogger from "src/Logger/ILogger";
 import { log } from "src/Logger/Loggers";
 import IBlockchainDataFactory from "src/Interfaces/IBlockchainDataFactory";
-import IBlockchainChecker from "src/Interfaces/IBlockchainChecker";
+import IBlockchainOperator from "src/Interfaces/IBlockchainOperator";
 
 export class Node {
     private protocol: INodeProtocol;
     private factory: IBlockchainDataFactory;
-    private chainChecker: IBlockchainChecker;
+    private chainOperator: IBlockchainOperator;
     private chain: unknown[];
     private log: ILogger = log;
 
@@ -26,7 +26,7 @@ export class Node {
         this.factory = factory;
         this.protocol = protocol;
         this.log = logger;
-        this.chainChecker = this.factory.createChainCheckerInstance();
+        this.chainOperator = this.factory.createChainOperatorInstance();
 
         this.protocol.onBroadcast(
             "blocks",
@@ -69,7 +69,7 @@ export class Node {
         const obj = JSON.parse(data);
         const blockArrayValidation = BlockArrayValidator.safeParse(obj);
         if (blockArrayValidation.success) {
-            const rangeValidation = this.chainChecker.validateBlockRange(
+            const rangeValidation = this.chainOperator.validateBlockRange(
                 this.chain,
                 blockArrayValidation.data
             );

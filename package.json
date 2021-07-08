@@ -11,6 +11,7 @@
     "author": "",
     "license": "ISC",
     "devDependencies": {
+        "@types/deep-equal": "^1.0.1",
         "@types/jest": "^26.0.23",
         "@types/ndjson": "^2.0.0",
         "@types/node": "^15.12.2",
@@ -24,6 +25,7 @@
     "dependencies": {
         "@types/lodash": "^4.14.170",
         "@types/uuid": "^8.3.0",
+        "deep-equal": "^2.0.5",
         "duplex-json-stream": "^1.0.1",
         "fully-connected-topology": "^1.1.1",
         "hash-to-port": "^1.2.0",

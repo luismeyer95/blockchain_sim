@@ -1,5 +1,8 @@
-import { BlockType } from "src/BlockchainDataFactory/IBlock";
-import { AccountTransactionType } from "src/BlockchainDataFactory/IAccountTransaction";
+import { BlockType, BlockValidator } from "src/BlockchainDataFactory/IBlock";
+import {
+    AccountTransactionType,
+    AccountTransactionValidator,
+} from "src/BlockchainDataFactory/IAccountTransaction";
 import { AccountOperationType } from "src/BlockchainDataFactory/IAccountOperation";
 import {
     hash,
@@ -9,41 +12,16 @@ import {
     serializeKey,
     sign,
 } from "src/Encryption/Encryption";
-import IBlockchainChecker from "src/Interfaces/IBlockchainChecker";
+import {
+    IBlockchainOperator,
+    TransactionInfo,
+    TransactionValidationResult,
+    BlockRangeValidationResult,
+} from "src/Interfaces/IBlockchainOperator";
 import { last } from "lodash";
 import { KeyObject } from "crypto";
 
-type BlockRangeValidationResult =
-    | {
-          success: true;
-          chain: BlockType[];
-      }
-    | {
-          success: false;
-          missing: [number, number] | null;
-      };
-
-type TransactionValidationResult =
-    | {
-          success: true;
-      }
-    | {
-          success: false;
-          message: string;
-      };
-
-type TransactionInfo = {
-    from: {
-        address: KeyObject;
-    };
-    to: Array<{
-        address: KeyObject;
-        amount: number;
-    }>;
-    fee: number;
-};
-
-export class BlockchainChecker implements IBlockchainChecker {
+export class BlockchainOperator implements IBlockchainOperator {
     constructor() {}
 
     validateBlockRange(
@@ -69,6 +47,14 @@ export class BlockchainChecker implements IBlockchainChecker {
             success: true,
             chain: resultChain,
         };
+    }
+
+    getTransactionShapeValidator() {
+        return AccountTransactionValidator;
+    }
+
+    getBlockShapeValidator() {
+        return BlockValidator;
     }
 
     validateTransaction(
