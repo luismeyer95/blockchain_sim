@@ -5,24 +5,25 @@ import {
     serializeKey,
 } from "src/Encryption/Encryption";
 
-const ParentProcessMessage = z.object({
-    data: BlockValidator,
-    complexity: z.number().refine((c) => {
-        return c >= 0 && c <= 32;
-    }),
-});
+const ParentProcessMessage = z
+    .object({
+        block: BlockValidator,
+        complexity: z.number().refine((c) => {
+            return c >= 0 && c <= 32;
+        }),
+    })
+    .strict();
 
 export type ParentProcessMessage = z.infer<typeof ParentProcessMessage>;
 
 let nonce: number = 0;
-let currentData: BlockType | null = null;
+let currentBlock: BlockType | null = null;
 let complexity: number = 32;
 
-process.on("message", (msg: string) => {
-    const obj: unknown = JSON.parse(msg);
+process.on("message", (obj: unknown) => {
     const messageValidation = ParentProcessMessage.safeParse(obj);
     if (messageValidation.success) {
-        currentData = messageValidation.data.data;
+        currentBlock = messageValidation.data.block;
         complexity = messageValidation.data.complexity;
         nonce = 0;
     } else {
@@ -37,13 +38,15 @@ setInterval(() => {
 }, 4000);
 
 function mine() {
-    if (currentData) {
-        currentData.payload.nonce = nonce;
-        const serializedBlock = JSON.stringify(currentData);
-        const check = hashSatisfiesComplexity(serializedBlock, complexity);
+    if (currentBlock) {
+        currentBlock.payload.nonce = nonce;
+        const serializedPayload = JSON.stringify(currentBlock.payload);
+        const check = hashSatisfiesComplexity(serializedPayload, complexity);
         if (check.success) {
-            sendProof();
-            currentData = null;
+            const blockHash = check.hash.toString("base64");
+            currentBlock.header.hash = blockHash;
+            sendProof(currentBlock);
+            currentBlock = null;
         } else {
             ++nonce;
         }
@@ -51,10 +54,9 @@ function mine() {
     setImmediate(mine);
 }
 
-function sendProof() {
+function sendProof(block: BlockType) {
     process.send!({
-        data: currentData,
+        block,
         complexity,
-        nonce,
     });
 }

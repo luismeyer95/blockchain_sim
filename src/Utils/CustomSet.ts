@@ -1,3 +1,5 @@
+import _ from "lodash";
+
 export class CustomSet<T> {
     private set: T[];
 
@@ -27,5 +29,13 @@ export class CustomSet<T> {
 
     add(value: T) {
         if (!this.has(value)) this.set.push(value);
+    }
+
+    forEach(fn: (el: T) => any) {
+        this.set.forEach(fn);
+    }
+
+    getArray() {
+        return this.set;
     }
 }

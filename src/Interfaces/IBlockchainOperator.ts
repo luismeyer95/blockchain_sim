@@ -50,4 +50,10 @@ export interface IBlockchainOperator {
         info: TransactionInfo,
         privateKey: KeyObject
     ): unknown;
+
+    createBlockTemplate(
+        keypair: KeyPairKeyObjectResult,
+        txs: unknown[],
+        chain: unknown[]
+    ): unknown;
 }

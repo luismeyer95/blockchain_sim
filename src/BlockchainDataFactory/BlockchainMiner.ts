@@ -9,15 +9,15 @@ import { z } from "zod";
 import { ChildProcess, fork } from "child_process";
 import ILogger from "src/Logger/ILogger";
 import { log } from "src/Logger/Loggers";
-import { isNonceGold } from "src/Encryption/Encryption";
+import { serializeKey, deserializeKey } from "src/Encryption/Encryption";
 import EventEmitter from "events";
+import { AccountOperationType } from "./IAccountOperation";
 const deepEqual = require("deep-equal");
 
 const PowProcessMessage = z
     .object({
-        data: BlockValidator,
+        block: BlockValidator,
         complexity: z.number(),
-        nonce: z.number(),
     })
     .strict();
 
@@ -28,13 +28,17 @@ export class BlockchainMiner implements IBlockchainMiner {
         new CustomSet<AccountTransactionType>((a, b) => {
             return a.header.signature === b.header.signature;
         });
-    private chain: BlockType[];
-    private worker: ChildProcess;
+
+    private keypair: KeyPairKeyObjectResult;
+    private chain: BlockType[] = [];
+    private worker: ChildProcess | null = null;
     private log: ILogger;
     private events: EventEmitter = new EventEmitter();
-    private operator: IBlockchainOperator = new BlockchainOperator();
+    private operator: BlockchainOperator = new BlockchainOperator();
+    private updateInterval: ReturnType<typeof setInterval> | null = null;
 
-    constructor(logger: ILogger = log) {
+    constructor(keypair: KeyPairKeyObjectResult, logger: ILogger = log) {
+        this.keypair = keypair;
         this.log = logger;
     }
 
@@ -78,34 +82,38 @@ export class BlockchainMiner implements IBlockchainMiner {
         this.worker = fork("./src/BlockchainDataFactory/pow_process.ts", [], {
             execArgv: ["-r", "ts-node/register"],
         });
-        // this.worker = fork("pow_process.ts");
         this.worker.on("message", (msg: unknown) => {
             const messageValidation = PowProcessMessage.safeParse(msg);
             if (messageValidation.success) {
-                const receivedNonce = messageValidation.data.nonce;
-                const nonceValidator = isNonceGold(
-                    receivedNonce,
-                    messageValidation.data.data,
-                    messageValidation.data.complexity
-                );
-                if (nonceValidator.success)
-                    this.events.emit("mined block", messageValidation.data);
+                this.events.emit("mined block", messageValidation.data.block);
             } else {
                 console.log("[pow parent]: bad worker response");
             }
         });
+        this.updateInterval = setInterval(() => {
+            const blockTemplate: BlockType = this.operator.createBlockTemplate(
+                this.keypair,
+                this.txCache.getArray(),
+                this.chain
+            );
+            // TODO: remove hardcoded complexity!!
+            this.updateTaskData(blockTemplate, 23);
+        }, 1000);
     }
 
-    private updateTaskData(data: string, complexity: number): void {
-        this.worker.send(
-            JSON.stringify({
-                data,
-                complexity,
-            })
-        );
+    private updateTaskData(block: BlockType, complexity: number): void {
+        if (!this.worker) return;
+        this.worker.send({
+            block,
+            complexity,
+        });
     }
 
-    stopMining(): void {}
+    stopMining(): void {
+        this.worker?.kill("SIGINT");
+        if (this.updateInterval) clearInterval(this.updateInterval);
+        this.updateInterval = null;
+    }
 
     onMinedBlock(fn: (block: BlockType) => void): void {
         this.events.on("mined block", fn);

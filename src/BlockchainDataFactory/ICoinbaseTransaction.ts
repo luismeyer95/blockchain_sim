@@ -21,3 +21,7 @@ export const CoinbaseTransactionValidator = z.object({
         timestamp: z.number(),
     }),
 });
+
+export type CoinbaseTransactionType = z.infer<
+    typeof CoinbaseTransactionValidator
+>;
