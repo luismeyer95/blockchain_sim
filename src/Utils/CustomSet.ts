@@ -7,6 +7,7 @@ export class CustomSet<T> {
 
     constructor(comp: (a: T, b: T) => boolean) {
         this.comp = comp;
+        this.set = [];
     }
 
     has(value: T) {
@@ -37,5 +38,10 @@ export class CustomSet<T> {
 
     getArray() {
         return this.set;
+    }
+
+    fromArray(arr: T[]) {
+        this.set = [];
+        arr.forEach((el) => this.add(el));
     }
 }

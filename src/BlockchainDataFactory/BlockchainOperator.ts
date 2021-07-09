@@ -16,11 +16,20 @@ import {
     IBlockchainOperator,
     TransactionInfo,
     TransactionValidationResult,
-    BlockRangeValidationResult,
 } from "src/Interfaces/IBlockchainOperator";
 import { fromPairs, last, sum } from "lodash";
 import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import { CoinbaseTransactionType } from "./ICoinbaseTransaction";
+
+export type BlockRangeValidationResult =
+    | {
+          success: true;
+          chain: BlockType[];
+      }
+    | {
+          success: false;
+          missing: [number, number] | null;
+      };
 
 export class BlockchainOperator implements IBlockchainOperator {
     constructor() {}
@@ -37,13 +46,13 @@ export class BlockchainOperator implements IBlockchainOperator {
         const resultChain = chain.filter(
             (block) => block.payload.index < blocks[0].payload.index
         );
-        try {
-            blocks.forEach((block) => {
-                this.tryAddBlock(resultChain, block);
-            });
-        } catch {
-            return { success: false, missing: null };
-        }
+        // try {
+        blocks.forEach((block) => {
+            this.tryAddBlock(resultChain, block);
+        });
+        // } catch {
+        // return { success: false, missing: null };
+        // }
         return {
             success: true,
             chain: resultChain,
@@ -156,19 +165,19 @@ export class BlockchainOperator implements IBlockchainOperator {
             revChain
         );
         const payload = {
-            timestamp: Date.now(),
             to,
+            timestamp: Date.now(),
         };
         const payloadBuf = Buffer.from(JSON.stringify(payload));
-        const signature = sign(payloadBuf, keypair.privateKey).toString(
-            "base64"
-        );
-        return {
+        const signatureBuf = sign(payloadBuf, keypair.privateKey);
+        const signature = signatureBuf.toString("base64");
+        const coinbase = {
             header: {
                 signature,
             },
             payload,
         };
+        return coinbase;
     }
 
     createBlockTemplate(
@@ -230,7 +239,7 @@ export class BlockchainOperator implements IBlockchainOperator {
         const revChain = this.getReverseChain(chain, block.payload.index);
 
         // TODO: REMOVE HARDCODED COMPLEXITY!!
-        this.verifyBlockPayloadHash(block, 23);
+        this.verifyBlockPayloadHash(block, 20);
         this.verifyIncludedPrevBlockHash(chain, block);
         this.verifyBlockCoinbaseSignature(block);
         this.verifyBlockTimestamps(chain, block);
@@ -279,18 +288,21 @@ export class BlockchainOperator implements IBlockchainOperator {
 
     private verifyBlockTimestamps(chain: BlockType[], block: BlockType) {
         const prevBlock = this.getPreviousBlock(chain, block);
+        const now = Date.now();
+        const blockStamp = block.payload.timestamp;
+        const coinbaseStamp = block.payload.coinbase.payload.timestamp;
+        let blockCheck: boolean, coinbaseCheck: boolean;
         if (prevBlock) {
-            const blockCheck =
-                prevBlock.payload.timestamp < block.payload.timestamp &&
-                block.payload.timestamp < Date.now();
-            const coinbaseTimestamp = block.payload.coinbase.payload.timestamp;
-            const coinbaseCheck =
-                prevBlock.payload.timestamp < coinbaseTimestamp &&
-                coinbaseTimestamp < Date.now();
-            if (!blockCheck || !coinbaseCheck)
-                throw new Error("bad block timestamps");
+            const prevBlockStamp = prevBlock.payload.timestamp;
+            blockCheck = prevBlockStamp < blockStamp && blockStamp < now;
+            coinbaseCheck =
+                prevBlockStamp < coinbaseStamp && coinbaseStamp < now;
+        } else {
+            blockCheck = blockStamp < now;
+            coinbaseCheck = coinbaseStamp < now;
         }
-        throw new Error("error: did not check for block continuity");
+        if (!blockCheck || !coinbaseCheck)
+            throw new Error("bad block timestamps");
     }
 
     private getPreviousBlock(
@@ -303,17 +315,13 @@ export class BlockchainOperator implements IBlockchainOperator {
     }
 
     private verifyBlockCoinbaseSignature(block: BlockType) {
-        const coinbaseSig = Buffer.from(
-            block.payload.coinbase.header.signature,
-            "base64"
-        );
+        const coinbase = block.payload.coinbase;
+        const coinbaseSig = Buffer.from(coinbase.header.signature, "base64");
         const publicKeyMiner = deserializeKey(
-            block.payload.coinbase.payload.to.address,
+            coinbase.payload.to.address,
             "public"
         );
-        const coinbasePayload = Buffer.from(
-            JSON.stringify(block.payload.coinbase.payload)
-        );
+        const coinbasePayload = Buffer.from(JSON.stringify(coinbase.payload));
         if (!verify(coinbasePayload, publicKeyMiner, coinbaseSig))
             throw new Error("bad block coinbase signature");
     }
@@ -355,7 +363,7 @@ export class BlockchainOperator implements IBlockchainOperator {
         publicKey: string,
         revChain: BlockType[]
     ): {
-        op: IAccountOperation;
+        op: AccountOperationType;
         ref: string;
     } | null {
         for (const block of revChain) {

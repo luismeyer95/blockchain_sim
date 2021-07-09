@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.hashSatisfiesComplexity = exports.isNonceGold = exports.keyEquals = exports.deserializeKeyPair = exports.serializeKeyPair = exports.serializeKey = exports.deserializeKey = exports.hash = exports.genKeyPair = exports.verify = exports.sign = void 0;
+exports.isNonceGold = exports.keyEquals = exports.deserializeKeyPair = exports.serializeKeyPair = exports.serializeKey = exports.deserializeKey = exports.hash = exports.genKeyPair = exports.verify = exports.sign = void 0;
 var crypto_1 = __importDefault(require("crypto"));
 var sign = function (data, privateKey) {
     return crypto_1.default.sign("sha256", data, {
@@ -88,20 +88,3 @@ function isNonceGold(nonce, data, leadingZeroBits) {
     };
 }
 exports.isNonceGold = isNonceGold;
-function hashSatisfiesComplexity(data, complexity) {
-    if (complexity <= 0 || complexity > 32)
-        throw new Error("error: invalid leading zero bits argument");
-    var shift = 1 << (32 - complexity);
-    var bitnum = ~(shift - 1);
-    var hashRes = exports.hash(Buffer.from(data));
-    var buf = hashRes.copy().digest();
-    var u32 = buf.readUInt32BE();
-    var success = (u32 & bitnum) === 0;
-    if (!success)
-        return { success: false };
-    return {
-        success: success,
-        hash: buf,
-    };
-}
-exports.hashSatisfiesComplexity = hashSatisfiesComplexity;

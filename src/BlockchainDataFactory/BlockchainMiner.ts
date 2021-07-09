@@ -37,15 +37,13 @@ export class BlockchainMiner implements IBlockchainMiner {
     private operator: BlockchainOperator = new BlockchainOperator();
     private updateInterval: ReturnType<typeof setInterval> | null = null;
 
-    constructor(keypair: KeyPairKeyObjectResult, logger: ILogger = log) {
-        this.keypair = keypair;
+    constructor(logger: ILogger = log) {
         this.log = logger;
     }
 
-    // adds a tx to the cached txs, to be included inside the block.
+    // adds a tx to the cached txs, to be included inside the block template
     addTransaction(tx: AccountTransactionType): void {
-        if (this.operator.validateTransaction(this.chain, tx))
-            this.txCache.add(tx);
+        this.txCache.add(tx);
     }
 
     // updates the local chain state by only replacing/processing blocks
@@ -78,7 +76,33 @@ export class BlockchainMiner implements IBlockchainMiner {
         });
     }
 
+    private filterValidTransactions(txs: AccountTransactionType[]) {
+        return txs.filter((tx) => {
+            const result = this.operator.validateTransaction(this.chain, tx);
+            return result.success;
+        });
+    }
+
+    private cleanupTxCache() {
+        const txs = this.txCache.getArray();
+        const validTxs = this.filterValidTransactions(txs);
+        this.txCache.fromArray(validTxs);
+    }
+
+    private updateMinedTemplateState = () => {
+        this.cleanupTxCache();
+        const blockTemplate: BlockType = this.operator.createBlockTemplate(
+            this.keypair,
+            this.txCache.getArray(),
+            this.chain
+        );
+        // TODO: remove hardcoded complexity!!
+        this.updateTaskData(blockTemplate, 20);
+    };
+
     startMining(keypair: KeyPairKeyObjectResult): void {
+        if (this.worker) throw new Error("worker is already mining");
+        this.keypair = keypair;
         this.worker = fork("./src/BlockchainDataFactory/pow_process.ts", [], {
             execArgv: ["-r", "ts-node/register"],
         });
@@ -90,15 +114,14 @@ export class BlockchainMiner implements IBlockchainMiner {
                 console.log("[pow parent]: bad worker response");
             }
         });
-        this.updateInterval = setInterval(() => {
-            const blockTemplate: BlockType = this.operator.createBlockTemplate(
-                this.keypair,
-                this.txCache.getArray(),
-                this.chain
-            );
-            // TODO: remove hardcoded complexity!!
-            this.updateTaskData(blockTemplate, 23);
-        }, 1000);
+        process.on("exit", () => {
+            this.killMinerProcess();
+        });
+        this.updateInterval = setInterval(this.updateMinedTemplateState, 1000);
+    }
+
+    private killMinerProcess() {
+        this.worker?.kill("SIGINT");
     }
 
     private updateTaskData(block: BlockType, complexity: number): void {
@@ -110,7 +133,7 @@ export class BlockchainMiner implements IBlockchainMiner {
     }
 
     stopMining(): void {
-        this.worker?.kill("SIGINT");
+        this.killMinerProcess();
         if (this.updateInterval) clearInterval(this.updateInterval);
         this.updateInterval = null;
     }

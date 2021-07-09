@@ -1,34 +1,22 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+var BlockchainMiner_1 = require("./BlockchainDataFactory/BlockchainMiner");
 var Encryption_1 = require("./Encryption/Encryption");
-// const node = new Node();
-// const keypair = genKeyPair();
-// process.stdin.on("data", () => {
-//     node.createInitialTransaction(keypair, 12);
-//     const tx = new SignedTransaction({
-//         input: { from: keypair.publicKey },
-//         outputs: [{ to: keypair.publicKey, amount: 15 }],
-//     });
-//     tx.sign(keypair.privateKey);
-//     node.protocol.process(tx);
+// const ptcl: INodeProtocol = new NodeProtocol(log, new NodeNet(log));
+// ptcl.onBroadcast("cock", (data, peer, relay) => {
+//     if (data.trim() === "pussy") {
+//         console.log("relayed!");
+//         relay();
+//     }
 // });
-// const worker = new ProofWorker();
-// worker.updateTaskData("hello world", 16);
-// worker.on("pow", (data: PowProcessMessage) => {
-//     console.log(data);
+// stdin.on("data", (buf: Buffer) => {
+//     ptcl.broadcast("cock", buf.toString());
 // });
-function testHash(nonce, strdata, leadingZeroBits) {
-    if (leadingZeroBits <= 0 || leadingZeroBits > 32)
-        throw new Error("error: invalid leading zero bits argument");
-    var shift = 1 << (32 - leadingZeroBits);
-    var bitnum = ~(shift - 1);
-    console.log(dec2bin(bitnum));
-    var hashRes = Encryption_1.hash(Buffer.from(strdata));
-    var buf = hashRes.copy().digest();
-    var u32 = buf.readUInt32BE();
-    return !(u32 & bitnum);
-}
-function dec2bin(dec) {
-    return (dec >>> 0).toString(2);
-}
-testHash(1234, "1234", 1);
+////////////////
+var kp = Encryption_1.genKeyPair();
+var miner = new BlockchainMiner_1.BlockchainMiner();
+miner.onMinedBlock(function (block) {
+    console.log("~ BLOCK WAS MINED :) ~");
+    console.log(block);
+});
+miner.startMining(kp);
