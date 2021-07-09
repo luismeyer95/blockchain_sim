@@ -139,6 +139,8 @@ export class BlockchainOperator implements IBlockchainOperator {
             payload: txPayload,
         };
         this.verifyTransaction(tx, revChain);
+        // console.log(JSON.stringify(tx, null, 4));
+        // process.exit(0);
         return tx;
     }
 
@@ -505,8 +507,9 @@ export class BlockchainOperator implements IBlockchainOperator {
             0
         );
         const sourceBalance = tx.payload.from.operation;
-        if (sourceBalance + destBalance + tx.payload.miner_fee !== 0)
-            throw new Error("bad transaction balance");
+        const balance = sourceBalance + destBalance + tx.payload.miner_fee;
+        if (balance !== 0)
+            throw new Error(`bad transaction balance: ${balance} !== 0`);
     }
 
     private verifyNoNegativeBalanceInTransaction(tx: AccountTransactionType) {

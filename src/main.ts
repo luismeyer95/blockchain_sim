@@ -14,6 +14,8 @@ import {
     verify,
 } from "./Encryption/Encryption";
 import { BlockType } from "./BlockchainDataFactory/IBlock";
+import { KeyPairKeyObjectResult } from "crypto";
+import { Storage } from "./Storage/Storage";
 
 // const ptcl: INodeProtocol = new NodeProtocol(log, new NodeNet(log));
 
@@ -30,36 +32,50 @@ import { BlockType } from "./BlockchainDataFactory/IBlock";
 
 ////////////////
 
-let chain: BlockType[] = [];
-const kp = genKeyPair();
+let chain: BlockType[] = Storage.loadBlockchain() as BlockType[];
+
+let kp = Storage.loadAccount("main");
+
 const miner = new BlockchainMiner();
 const operator = new BlockchainOperator();
+
+miner.setMinerAccount(kp);
+miner.setChainState(chain);
 miner.onMinedBlock((block) => {
     console.log("~ BLOCK WAS MINED :) ~");
-    const prettyJson = JSON.stringify(block, null, 2);
+    const prettyJson = JSON.stringify(block, null, 4);
     console.log(prettyJson);
 
     const blockValidation = operator.validateBlockRange(chain, [block]);
     if (blockValidation.success) {
         chain = blockValidation.chain;
+        miner.setChainState(chain);
+        Storage.saveBlockchain(chain);
     } else {
         console.log("~ BAD BLOCK :( ~");
-        // console.log(`error: ${blockValidation.missing}`)
         process.exit(1);
     }
-    miner.setChainState(chain);
 });
-miner.startMining(kp);
+miner.startMining();
 
-/////////////////////
+const transfer = () => {
+    const source = Storage.loadAccount("luis");
+    const dest = Storage.loadAccount("agathe");
+    const txInfo = {
+        from: { address: source.publicKey },
+        to: [
+            {
+                address: dest.publicKey,
+                amount: 1,
+            },
+        ],
+        fee: 1,
+    };
+    const tx = operator.createTransaction(chain, txInfo, source.privateKey);
+    miner.addTransaction(tx);
+};
 
-// let kp = genKeyPair();
-// let data = Buffer.from(JSON.stringify({ hello: "world" }));
-// let sigBuf = sign(data, kp.privateKey);
+// setInterval(transfer, 15000);
+transfer();
 
-// let sigSerial = sigBuf.toString("base64");
-// let pubKeySerial = serializeKey(kp.publicKey);
-
-// sigBuf = Buffer.from(sigSerial, "base64");
-// let pubKey = deserializeKey(pubKeySerial, "public");
-// console.log(verify(data, pubKey, sigBuf));
+/////////////////////////////

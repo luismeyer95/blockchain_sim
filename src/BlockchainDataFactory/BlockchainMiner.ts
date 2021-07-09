@@ -100,9 +100,14 @@ export class BlockchainMiner implements IBlockchainMiner {
         this.updateTaskData(blockTemplate, 20);
     };
 
-    startMining(keypair: KeyPairKeyObjectResult): void {
-        if (this.worker) throw new Error("worker is already mining");
+    setMinerAccount(keypair: KeyPairKeyObjectResult) {
         this.keypair = keypair;
+    }
+
+    startMining(): void {
+        if (this.worker) throw new Error("worker is already mining");
+        if (!this.keypair)
+            throw new Error("cannot mine without a miner keypair");
         this.worker = fork("./src/BlockchainDataFactory/pow_process.ts", [], {
             execArgv: ["-r", "ts-node/register"],
         });
@@ -121,7 +126,11 @@ export class BlockchainMiner implements IBlockchainMiner {
     }
 
     private killMinerProcess() {
-        this.worker?.kill("SIGINT");
+        if (this.worker) {
+            this.worker.removeAllListeners();
+            this.worker.kill("SIGINT");
+        }
+        this.worker = null;
     }
 
     private updateTaskData(block: BlockType, complexity: number): void {
