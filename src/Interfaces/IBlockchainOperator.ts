@@ -21,13 +21,9 @@ export type TransactionValidationResult =
       };
 
 export type TransactionInfo = {
-    from: {
-        address: KeyObject;
-    };
-    to: Array<{
-        address: KeyObject;
-        amount: number;
-    }>;
+    from: KeyObject;
+    to: KeyObject;
+    amount: number;
     fee: number;
 };
 
@@ -40,7 +36,7 @@ export interface IBlockchainOperator {
     validateTransaction(
         chain: unknown[],
         tx: unknown,
-        txPool?: unknown[]
+        txPool: unknown[]
     ): TransactionValidationResult;
 
     getTransactionShapeValidator(): z.ZodAny;
