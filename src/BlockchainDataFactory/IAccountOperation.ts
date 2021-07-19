@@ -8,8 +8,8 @@ export default interface IAccountOperation {
     // representing its state change in the context of a tx
     operation: number;
 
-    // base64 signature hash of the last tx referencing the account's balance
-    last_ref: string | null;
+    // a counter for the operation history of the account, prevents replay attacks
+    op_nonce: number;
 
     // newly computed balance of the account using last_ref's balance
     updated_balance: number;
@@ -18,7 +18,7 @@ export default interface IAccountOperation {
 export const AccountOperationValidator = z.object({
     address: z.string(),
     operation: z.number(),
-    last_ref: z.string().or(z.null()),
+    op_nonce: z.number(),
     updated_balance: z.number(),
 });
 

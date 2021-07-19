@@ -40,6 +40,7 @@ export interface IBlockchainOperator {
     validateTransaction(
         chain: unknown[],
         tx: unknown
+        // txPool?: unknown[]
     ): TransactionValidationResult;
 
     getTransactionShapeValidator(): z.ZodAny;

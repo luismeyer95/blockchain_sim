@@ -20,12 +20,8 @@ export const AccountTransactionValidator = z.object({
         // nodes validate that from.operation + sum(to[].operation) + miner_fee === 0
         // source account must have a last_ref!
         from: AccountOperationValidator,
-        to: z.array(AccountOperationValidator),
+        to: AccountOperationValidator,
         miner_fee: z.number(),
-        // unix time
-        // important: a transaction timestamp older than the last mined
-        // block's timestamp should be considered invalid
-        timestamp: z.number(),
     }),
 });
 

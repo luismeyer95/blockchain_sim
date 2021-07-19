@@ -1,4 +1,4 @@
-import IBlockchainOperator from "src/Interfaces/IBlockchainOperator";
+import { IBlockchainOperator } from "src/Interfaces/IBlockchainOperator";
 import { z } from "zod";
 
 export default interface IBlockchainDataFactory {
