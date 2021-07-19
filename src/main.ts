@@ -15,7 +15,8 @@ import {
 } from "./Encryption/Encryption";
 import { BlockType } from "./BlockchainDataFactory/IBlock";
 import { KeyPairKeyObjectResult } from "crypto";
-import { Storage } from "./Storage/Storage";
+import { BlockchainStorage } from "./BlockchainDataFactory/BlockchainStorage";
+import { IBlockchainStorage } from "./Interfaces/IBlockchainStorage";
 
 // const ptcl: INodeProtocol = new NodeProtocol(log, new NodeNet(log));
 
@@ -32,9 +33,10 @@ import { Storage } from "./Storage/Storage";
 
 ////////////////
 
-let chain: BlockType[] = Storage.loadBlockchain() as BlockType[];
+const storage: IBlockchainStorage = new BlockchainStorage();
+let chain: BlockType[] = storage.loadBlockchain() as BlockType[];
 
-let kp = Storage.loadAccount("main");
+let kp = storage.loadAccount("main");
 
 const miner = new BlockchainMiner();
 const operator = new BlockchainOperator();
@@ -50,7 +52,7 @@ miner.onMinedBlock((block) => {
     if (blockValidation.success) {
         chain = blockValidation.chain;
         miner.setChainState(chain);
-        Storage.saveBlockchain(chain);
+        storage.saveBlockchain(chain);
     } else {
         console.log("~ BAD BLOCK :( ~");
         process.exit(1);
@@ -59,8 +61,8 @@ miner.onMinedBlock((block) => {
 miner.startMining();
 
 const transfer = () => {
-    const source = Storage.loadAccount("luis");
-    const dest = Storage.loadAccount("agathe");
+    const source = storage.loadAccount("luis");
+    const dest = storage.loadAccount("agathe");
     const txInfo = {
         from: { address: source.publicKey },
         to: [
@@ -76,6 +78,6 @@ const transfer = () => {
 };
 
 // setInterval(transfer, 15000);
-transfer();
+// transfer();
 
 /////////////////////////////
