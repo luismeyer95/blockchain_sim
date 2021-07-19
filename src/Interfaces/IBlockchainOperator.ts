@@ -39,17 +39,18 @@ export interface IBlockchainOperator {
 
     validateTransaction(
         chain: unknown[],
-        tx: unknown
-        // txPool?: unknown[]
+        tx: unknown,
+        txPool?: unknown[]
     ): TransactionValidationResult;
 
     getTransactionShapeValidator(): z.ZodAny;
     getBlockShapeValidator(): z.ZodAny;
 
     createTransaction(
-        chain: unknown[],
         info: TransactionInfo,
-        privateKey: KeyObject
+        privateKey: KeyObject,
+        chain: unknown[],
+        txPool: unknown[]
     ): unknown;
 
     createBlockTemplate(

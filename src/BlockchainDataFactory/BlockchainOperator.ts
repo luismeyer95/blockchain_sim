@@ -104,9 +104,10 @@ export class BlockchainOperator implements IBlockchainOperator {
 
     // verify sum(to[].amount) + fee against account funds
     createTransaction(
-        chain: BlockType[],
         info: TransactionInfo,
-        privateKey: KeyObject
+        privateKey: KeyObject,
+        chain: BlockType[],
+        txPool: AccountTransactionType[]
     ): AccountTransactionType {
         const revChain = this.getReverseChain(chain);
         const destOperations: AccountOperationType[] = info.to.map((destOp) => {
@@ -261,7 +262,6 @@ export class BlockchainOperator implements IBlockchainOperator {
         txOp: AccountOperationType,
         revChain: BlockType[]
     ) {
-        // this.verifyNoPriorTxOnAccount(txOp.address, revChain);
         if (txOp.operation !== txOp.updated_balance)
             throw new Error("bad first account tx balance");
         const lastOp = this.retrieveLastAccountOperation(
@@ -284,11 +284,6 @@ export class BlockchainOperator implements IBlockchainOperator {
                 "operation nonce is not null but no record of last operation"
             );
         this.verifyOperationCongruence(lastOp, txOp);
-        // if (lastOp.op_nonce + 1 !== txOp.op_nonce)
-        //     throw new Error("bad op nonce");
-
-        // if (lastOp.updated_balance + txOp.operation !== txOp.updated_balance)
-        //     throw new Error("bad account balance update");
     }
 
     private retrieveLastAccountOperation(
@@ -416,46 +411,99 @@ export class BlockchainOperator implements IBlockchainOperator {
 
     private verifyTransaction(
         tx: AccountTransactionType,
-        revChain: BlockType[],
+        revChain: BlockType[]
         txPool?: AccountTransactionType[]
     ) {
-        this.verifyTransactionAgainstBlockchain(tx, revChain);
+        // this.verifyTransactionAgainstBlockchain(tx, revChain);
     }
 
-    private verifyTransactionAgainstBlockchain(
-        tx: AccountTransactionType,
+    // private verifyTransactionAgainstBlockchain(
+    //     tx: AccountTransactionType,
+    //     revChain: BlockType[]
+    // ) {
+    //     // if (tx.payload.from.op_nonce === 0)
+    //     //     throw new Error("source account of tx has null last ref");
+    //     this.verifyOperation(tx.payload.from, revChain);
+    //     this.verifyOperation(tx.payload.to, revChain);
+    //     this.verifyOperationSign(tx.payload.from, "from");
+    //     this.verifyTransactionSignature(tx);
+    //     this.verifyTransactionOperationsBalance(tx);
+    //     this.verifyNoNegativeBalanceInTransaction(tx);
+    //     this.verifyOperationSign(tx.payload.to, "to");
+    // }
+
+    // private verifyTransactionAgainstTrustedPool(
+    //     tx: AccountTransactionType,
+    //     txPool: AccountTransactionType[]
+    // ) {
+    //     this.verifyOperationAgainstTrustedPool(tx.payload.from, txPool);
+    //     this.verifyOperationAgainstTrustedPool(tx.payload.to, txPool);
+    // }
+
+    // private verifyOperationAgainstTrustedPool(
+    //     op: AccountOperationType,
+    //     txPool: AccountTransactionType[]
+    // ) {
+    //     const res = this.retrieveLastAccountOperationInTxPool(
+    //         op.address,
+    //         txPool
+    //     );
+    //     if (res) {
+    //         const { op: lastOp } = res;
+    //         this.verifyOperationCongruence(lastOp, op);
+    //     }
+    // }
+
+    private verifyOperationCongruence(
+        prev: AccountOperationType,
+        cur: AccountOperationType
+    ) {
+        if (prev.address != cur.address) throw new Error("different address");
+        if (prev.op_nonce + 1 !== cur.op_nonce) throw new Error("bad op nonce");
+        if (prev.updated_balance + cur.operation !== cur.updated_balance)
+            throw new Error("bad updated balance");
+    }
+
+    private verifyTransactionPoolAgainstBlockchain(
+        txPool: AccountTransactionType[],
         revChain: BlockType[]
     ) {
-        if (tx.payload.from.op_nonce === 0)
-            throw new Error("source account of tx has null last ref");
-        this.verifyNonZeroNonceOperation(tx.payload.from, revChain);
-        this.verifyOperationSign(tx.payload.from, "from");
-        this.verifyTransactionSignature(tx);
-        this.verifyTransactionOperationsBalance(tx);
-        this.verifyNoNegativeBalanceInTransaction(tx);
-        this.verifyOperationSign(tx.payload.to, "to");
-        this.verifyOperation(tx.payload.to, revChain);
+        _.forEachRight(txPool, (tx, index) => {
+            this.verifyOperationSign(tx.payload.from, "from");
+            this.verifyOperationSign(tx.payload.to, "to");
+            this.verifyTransactionSignature(tx);
+            this.verifyTransactionOperationsBalance(tx);
+            this.verifyNoNegativeBalanceInTransaction(tx);
+            this.verifyOperationAgainstPoolOrChain(
+                tx.payload.from,
+                revChain,
+                txPool,
+                index
+            );
+            this.verifyOperationAgainstPoolOrChain(
+                tx.payload.to,
+                revChain,
+                txPool,
+                index
+            );
+        });
     }
 
-    private verifyTransactionAgainstTrustedPool(
-        tx: AccountTransactionType,
-        txPool: AccountTransactionType[]
-    ) {
-        this.verifyOperationAgainstTrustedPool(tx.payload.from, txPool);
-        this.verifyOperationAgainstTrustedPool(tx.payload.to, txPool);
-    }
-
-    private verifyOperationAgainstTrustedPool(
+    private verifyOperationAgainstPoolOrChain(
         op: AccountOperationType,
-        txPool: AccountTransactionType[]
+        revChain: BlockType[],
+        txPool: AccountTransactionType[],
+        txPoolLength?: number
     ) {
         const res = this.retrieveLastAccountOperationInTxPool(
             op.address,
-            txPool
+            txPool,
+            txPoolLength ?? txPool.length // setting length to not include this op's tx
         );
         if (res) {
-            const { op: lastOp } = res;
-            this.verifyOperationCongruence(lastOp, op);
+            this.verifyOperationCongruence(res.op, op);
+        } else {
+            this.verifyOperation(op, revChain);
         }
     }
 
@@ -474,31 +522,6 @@ export class BlockchainOperator implements IBlockchainOperator {
                 return { index: i, op: tx.payload.to };
         }
         return null;
-    }
-
-    private verifyOperationCongruence(
-        prev: AccountOperationType,
-        cur: AccountOperationType
-    ) {
-        if (prev.address != cur.address) throw new Error("different address");
-        if (prev.op_nonce + 1 !== cur.op_nonce) throw new Error("bad op nonce");
-        if (prev.updated_balance + cur.operation !== cur.updated_balance)
-            throw new Error("bad updated balance");
-    }
-
-    private verifyTransactionPool() {
-        // let cur = null;
-        // let prev = null;
-        // do {
-        //     prev = cur;
-        //     cur = this.retrieveLastAccountOperationInTxPool(
-        //         tx.payload.from.address,
-        //         txPool
-        //     );
-        //     if (cur) {
-        //         if (res.op.op_nonce + 1 !== tx.payload.from.op_nonce)
-        //     }
-        // } while (res);
     }
 
     private verifyTransactionSignature(tx: AccountTransactionType) {
@@ -524,9 +547,11 @@ export class BlockchainOperator implements IBlockchainOperator {
     }
 
     private verifyBlockTransactions(block: BlockType, revChain: BlockType[]) {
-        for (const tx of block.payload.txs) {
-            this.verifyTransaction(tx, revChain);
-        }
+        // for (const tx of block.payload.txs) {
+        //     this.verifyTransaction(tx, revChain);
+        // }
+        this.verifyTransactionPoolAgainstBlockchain(block.payload.txs, revChain)
+
     }
 
     private verifyBlockFullRewardBalance(

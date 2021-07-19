@@ -73,7 +73,7 @@ const transfer = () => {
         ],
         fee: 1,
     };
-    const tx = operator.createTransaction(chain, txInfo, source.privateKey);
+    const tx = operator.createTransaction(txInfo, source.privateKey, chain, []);
     miner.addTransaction(tx);
 };
 
