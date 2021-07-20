@@ -142,7 +142,6 @@ export class BlockchainOperator implements IBlockchainOperator {
             from: fromOperation,
             to: destOperation,
             miner_fee: info.fee,
-            timestamp: Date.now(),
         };
         const txPayloadBuffer = Buffer.from(JSON.stringify(txPayload));
         const tx: AccountTransactionType = {
@@ -172,6 +171,7 @@ export class BlockchainOperator implements IBlockchainOperator {
         const sumFees = txs.reduce((acc, el) => {
             return acc + el.payload.miner_fee;
         }, 0);
+        // TODO: remove hardcoded!!
         const blockReward = 10;
         const revChain = this.getReverseChain(chain);
         const to = this.createAccountOperation(
@@ -255,7 +255,7 @@ export class BlockchainOperator implements IBlockchainOperator {
         const revChain = this.getReverseChain(chain, block.payload.index);
 
         // TODO: REMOVE HARDCODED COMPLEXITY!!
-        this.verifyBlockPayloadHash(block, 20);
+        this.verifyBlockPayloadHash(block, 19);
         this.verifyIncludedPrevBlockHash(chain, block);
         this.verifyBlockCoinbaseSignature(block);
         this.verifyBlockTimestamps(chain, block);
@@ -501,7 +501,6 @@ export class BlockchainOperator implements IBlockchainOperator {
     ) {
         this.verifyOperationSign(tx.payload.from, "from");
         this.verifyOperationSign(tx.payload.to, "to");
-        this.verifyTransactionSignature(tx);
         this.verifyTransactionOperationsBalance(tx);
         this.verifyNoNegativeBalanceInTransaction(tx);
         this.verifyOperationAgainstPoolOrChain(
@@ -510,6 +509,7 @@ export class BlockchainOperator implements IBlockchainOperator {
             txPool
         );
         this.verifyOperationAgainstPoolOrChain(tx.payload.to, revChain, txPool);
+        this.verifyTransactionSignature(tx);
     }
 
     private verifyOperationAgainstPoolOrChain(
@@ -545,6 +545,7 @@ export class BlockchainOperator implements IBlockchainOperator {
     }
 
     private verifyTransactionSignature(tx: AccountTransactionType) {
+        console.log("CHECKING SIG", tx.header.signature);
         const sig = Buffer.from(tx.header.signature, "base64");
         const fromKey = deserializeKey(tx.payload.from.address, "public");
         const txPayload = Buffer.from(JSON.stringify(tx.payload));
