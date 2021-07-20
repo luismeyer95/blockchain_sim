@@ -15,7 +15,7 @@ import {
 } from "src/Interfaces/IBlockchainOperator";
 
 import IBlockchainMiner from "src/Interfaces/IBlockchainMiner";
-import IBlockchainWallet from "src/Interfaces/IBlockchainMiner";
+import IBlockchainWallet from "src/Interfaces/IBlockchainWallet";
 import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import IBlockchainState from "src/Interfaces/IBlockchainState";
 
@@ -33,13 +33,15 @@ export class Node {
     constructor(
         factory: IBlockchainDataFactory,
         protocol: INodeProtocol,
-        logger: ILogger
+        logger: ILogger = log
     ) {
         this.state = factory.createStateInstance();
         this.chainOperator = factory.createChainOperatorInstance();
         this.factory = factory;
         this.protocol = protocol;
         this.log = logger;
+
+        const BlockValidator = this.factory.getBlockShapeValidator();
 
         this.protocol.onBroadcast(
             "blocks",
@@ -59,7 +61,16 @@ export class Node {
 
         this.protocol.onBroadcast(
             "tx",
-            (data: string, peer: string, relay) => {}
+            (data: string, peer: string, relay: () => void) => {
+                try {
+                    const tx = JSON.parse(data);
+                    this.processReceivedTransaction(tx, relay);
+                } catch (err) {
+                    this.log(
+                        `[node]: received bad transaction shape (broadcast)\n`
+                    );
+                }
+            }
         );
 
         this.protocol.onBlocksRequest(
@@ -102,24 +113,48 @@ export class Node {
         return null;
     }
 
-    createWallet(keypair: KeyPairKeyObjectResult) {
-        const wallet = this.factory.createWalletInstance(keypair, this.state);
+    private processReceivedTransaction(
+        tx: unknown,
+        onSuccess: () => void = () => {}
+    ) {
         const TransactionValidator =
             this.factory.getTransactionShapeValidator();
+        const txShapeValidation = TransactionValidator.safeParse(tx);
+        if (!txShapeValidation.success) return;
+        const txValidation = this.state.addTransaction(tx);
+        if (txValidation.success && onSuccess) onSuccess();
+        else if (!txValidation.success)
+            this.log(`[node]: bad transaction data, rejected\n`);
+    }
+
+    createWallet(keypair: KeyPairKeyObjectResult): IBlockchainWallet {
+        const wallet = this.factory.createWalletInstance(keypair, this.state);
         wallet.onTransaction((tx: unknown) => {
-            const txShapeValidation = TransactionValidator.safeParse(tx);
-            if (txShapeValidation.success) {
-                const tx = txShapeValidation.data;
-                const txValidation = this.state.addTransaction(tx);
-                if (txValidation.success)
-                    this.protocol.broadcast("tx", JSON.stringify(tx));
-                else this.log(`[node]: bad transaction data, rejected\n`);
-            }
+            this.processReceivedTransaction(tx, () => {
+                const txSerial = JSON.stringify(tx);
+                this.protocol.broadcast("tx", txSerial);
+            });
         });
         return wallet;
     }
 
-    createMiner(keypair: KeyPairKeyObjectResult) {
+    createMiner(keypair: KeyPairKeyObjectResult): IBlockchainMiner {
         const miner = this.factory.createMinerInstance(keypair, this.state);
+        const BlockValidator = this.factory.getBlockShapeValidator();
+        miner.onMinedBlock((block: unknown) => {
+            const blockShapeValidation = BlockValidator.safeParse(block);
+            if (!blockShapeValidation.success) return;
+            const chain = this.state.getChainState();
+            const blockValidation = this.chainOperator.validateBlockRange(
+                chain,
+                [blockShapeValidation.data]
+            );
+            if (
+                blockValidation.success &&
+                blockValidation.chain.length > chain.length
+            )
+                this.state.setChainState(blockValidation.chain);
+        });
+        return miner;
     }
 }

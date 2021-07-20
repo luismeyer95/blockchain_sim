@@ -9,7 +9,7 @@ import EventEmitter from "events";
 export class BlockchainState extends EventEmitter implements IBlockchainState {
     private operator: BlockchainOperator = new BlockchainOperator();
     // private events: EventEmitter = new EventEmitter();
-    private txpool: AccountTransactionType[];
+    private txpool: AccountTransactionType[] = [];
     private chain: BlockType[] = [];
     // private log: ILogger;
 

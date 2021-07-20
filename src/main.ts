@@ -18,6 +18,8 @@ import { KeyPairKeyObjectResult } from "crypto";
 import { BlockchainStorage } from "./BlockchainDataFactory/BlockchainStorage";
 import { IBlockchainStorage } from "./Interfaces/IBlockchainStorage";
 import { AccountTransactionType } from "./BlockchainDataFactory/IAccountTransaction";
+import { Node } from "src/Node/Node";
+import BlockchainDataFactory from "./BlockchainDataFactory/BlockchainDataFactory";
 
 // const ptcl: INodeProtocol = new NodeProtocol(log, new NodeNet(log));
 
@@ -83,53 +85,26 @@ import { AccountTransactionType } from "./BlockchainDataFactory/IAccountTransact
 
 /////////////////////////////
 
-let chain: BlockType[] = [];
-let txpool: AccountTransactionType[] = [];
+const kp = genKeyPair();
+const dest = genKeyPair();
 
-let acc1 = genKeyPair();
-let acc2 = genKeyPair();
+const node = new Node(
+    new BlockchainDataFactory(),
+    new NodeProtocol(new NodeNet())
+);
 
-const miner = new BlockchainMiner();
-const operator = new BlockchainOperator();
+const miner = node.createMiner(kp);
 
-miner.setMinerAccount(acc1);
-miner.setChainState(chain);
 miner.onMinedBlock((block) => {
     console.log("~ BLOCK WAS MINED :) ~");
     const prettyJson = JSON.stringify(block, null, 4);
     console.log(prettyJson);
-
-    const blockValidation = operator.validateBlockRange(chain, [block]);
-    if (blockValidation.success) {
-        chain = blockValidation.chain;
-        miner.setChainState(chain);
-        // miner.stopMining();
-        // afterMinedBlock();
-    } else {
-        console.log("~ BAD BLOCK :( ~");
-        process.exit(1);
-    }
 });
+
 miner.startMining();
 
-// const afterMinedBlock = () => {};
-
-const transfer = () => {
-    const txInfo = {
-        from: acc1.publicKey,
-        to: acc2.publicKey,
-        amount: 2,
-        fee: 0,
-    };
-    const tx = operator.createTransaction(
-        txInfo,
-        acc1.privateKey,
-        chain,
-        txpool
-    );
-    miner.addTransaction(tx);
-    txpool.push(tx);
-};
-
-setInterval(transfer, 15000);
-// transfer();
+const wallet = node.createWallet(kp);
+setInterval(() => {
+    wallet.submitTransaction(dest.publicKey, 1, 0);
+    wallet.submitTransaction(dest.publicKey, 1, 0);
+}, 15000);

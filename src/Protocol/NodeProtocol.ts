@@ -35,11 +35,11 @@ type BlocksResponseType = z.infer<typeof BlocksResponseValidator>;
 type BroadcastType = z.infer<typeof BroadcastValidator>;
 
 export class NodeProtocol implements INodeProtocol {
-    private log: ILogger = log;
+    private log: ILogger;
     private net: INodeNet;
     private events: EventEmitter;
 
-    constructor(logger: ILogger, net: INodeNet) {
+    constructor(net: INodeNet, logger: ILogger = log) {
         this.log = logger;
         this.net = net;
         this.events = new EventEmitter();

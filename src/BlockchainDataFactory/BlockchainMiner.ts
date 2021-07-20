@@ -44,6 +44,10 @@ export class BlockchainMiner implements IBlockchainMiner {
         this.log = logger;
         this.keypair = keypair;
         this.state = state;
+
+        process.on("exit", () => {
+            this.killMinerProcess();
+        });
     }
 
     // private filterValidTransactions(txs: AccountTransactionType[]) {
@@ -78,6 +82,10 @@ export class BlockchainMiner implements IBlockchainMiner {
 
     setMinerAccount(keypair: KeyPairKeyObjectResult) {
         this.keypair = keypair;
+        if (this.worker) {
+            this.stopMining();
+            this.startMining();
+        }
     }
 
     startMining(): void {
@@ -95,9 +103,7 @@ export class BlockchainMiner implements IBlockchainMiner {
                 console.log("[pow parent]: bad worker response");
             }
         });
-        process.on("exit", () => {
-            this.killMinerProcess();
-        });
+        this.updateMinedTemplateState();
         this.state.on("change", this.updateMinedTemplateState);
     }
 
@@ -120,8 +126,6 @@ export class BlockchainMiner implements IBlockchainMiner {
     stopMining(): void {
         this.killMinerProcess();
         this.state.removeAllListeners();
-        // if (this.updateInterval) clearInterval(this.updateInterval);
-        // this.updateInterval = null;
     }
 
     onMinedBlock(fn: (block: BlockType) => void): void {

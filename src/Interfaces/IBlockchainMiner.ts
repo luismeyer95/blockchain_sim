@@ -11,7 +11,9 @@ export default interface IBlockchainMiner {
 
     // getChainState(): unknown[];
 
-    startMining(keypair: KeyPairKeyObjectResult): void;
+    startMining(): void;
     stopMining(): void;
     onMinedBlock(fn: (block: unknown) => void): void;
+
+    setMinerAccount(keypair: KeyPairKeyObjectResult): void;
 }
