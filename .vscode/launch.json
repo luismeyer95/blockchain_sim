@@ -7,11 +7,23 @@
         {
             "type": "node",
             "request": "launch",
+            "runtimeExecutable": "node",
+            "runtimeArgs": [
+                "--nolazy",
+                "-r",
+                "ts-node/register/transpile-only"
+            ],
+            "cwd": "${workspaceRoot}",
             "name": "Launch Program",
-            "program": "${workspaceFolder}/src/main.ts", // our main file
+            // "program": "${workspaceFolder}/src/main.ts", // our main file
+            "args": ["src/main.ts"],
             "sourceMaps": true,
-            "preLaunchTask": "npm: debug",
-            "outFiles": ["${workspaceFolder}/build/main.js"]
+            // "preLaunchTask": "npm: debug",
+            // "outFiles": ["${workspaceFolder}/build/main.js"],
+            "env": {
+                "TS_NODE_PROJECT": "${workspaceFolder}/tsconfig.json",
+                "NODE_PATH": "."
+            }
         }
     ]
 }

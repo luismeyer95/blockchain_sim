@@ -58,7 +58,6 @@ export function deserializeKey(
 }
 
 export function serializeKey(key: KeyObject): Base64SerializedKey {
-    debugger;
     const serializedKey = key.export({
         type: "pkcs1",
         format: "pem",

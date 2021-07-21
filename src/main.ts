@@ -12,7 +12,7 @@ import {
     serializeKeyPair,
     sign,
     verify,
-} from "./Encryption/Encryption";
+} from "src/Encryption/Encryption";
 import { BlockType } from "./BlockchainDataFactory/IBlock";
 import { KeyPairKeyObjectResult } from "crypto";
 import { BlockchainStorage } from "./BlockchainDataFactory/BlockchainStorage";

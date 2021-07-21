@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var NodeNet_1 = require("src/Net/NodeNet");
 var NodeProtocol_1 = require("src/Protocol/NodeProtocol");
-var Encryption_1 = require("./Encryption/Encryption");
+var Encryption_1 = require("src/Encryption/Encryption");
 var Node_1 = require("src/Node/Node");
 var BlockchainDataFactory_1 = __importDefault(require("./BlockchainDataFactory/BlockchainDataFactory"));
 // const ptcl: INodeProtocol = new NodeProtocol(log, new NodeNet(log));
@@ -60,6 +60,7 @@ var BlockchainDataFactory_1 = __importDefault(require("./BlockchainDataFactory/B
 // setInterval(transfer, 15000);
 // transfer();
 /////////////////////////////
+console.log("ok");
 var kp = Encryption_1.genKeyPair();
 var dest = Encryption_1.genKeyPair();
 var node = new Node_1.Node(new BlockchainDataFactory_1.default(), new NodeProtocol_1.NodeProtocol(new NodeNet_1.NodeNet()));
