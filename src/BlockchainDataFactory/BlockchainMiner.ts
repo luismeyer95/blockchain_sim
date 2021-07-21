@@ -1,25 +1,15 @@
 import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import IBlockchainMiner from "src/Interfaces/IBlockchainMiner";
-import {
-    IBlockchainOperator,
-    TransactionInfo,
-} from "src/Interfaces/IBlockchainOperator";
 import { BlockchainOperator } from "./BlockchainOperator";
-import { AccountTransactionType } from "./IAccountTransaction";
 import { BlockType, BlockValidator } from "./IBlock";
-import { CustomSet } from "src/Utils/CustomSet";
 import { z } from "zod";
 import { ChildProcess, fork } from "child_process";
 import ILogger from "src/Logger/ILogger";
 import { log } from "src/Logger/Loggers";
-import {
-    hashSatisfiesComplexity,
-    serializeKey,
-    deserializeKey,
-} from "src/Encryption/Encryption";
+import { hashSatisfiesComplexity } from "src/Encryption/Encryption";
 import EventEmitter from "events";
-import { AccountOperationType } from "./IAccountOperation";
-import IBlockchainState from "src/Interfaces/IBlockchainState";
+import { DummyWorker } from "src/BlockchainDataFactory/DummyWorker";
+
 import { BlockchainState } from "./BlockchainState";
 
 const deepEqual = require("deep-equal");
@@ -32,48 +22,6 @@ const PowProcessMessage = z
     .strict();
 
 export type PowProcessMessage = z.infer<typeof PowProcessMessage>;
-
-class DummyWorker extends EventEmitter {
-    private nonce: number = 0;
-    private currentBlock: BlockType | null = null;
-    private complexity: number = 32;
-    constructor() {
-        super();
-        setImmediate(this.mine.bind(this));
-        setInterval(() => {
-            console.log("mining...");
-        }, 4000);
-    }
-
-    send(obj: { block: BlockType; complexity: number }) {
-        this.currentBlock = obj.block;
-        this.complexity = obj.complexity;
-        this.nonce = 0;
-    }
-
-    mine() {
-        if (this.currentBlock) {
-            this.currentBlock.payload.nonce = this.nonce;
-            const serializedPayload = JSON.stringify(this.currentBlock.payload);
-            const check = hashSatisfiesComplexity(
-                serializedPayload,
-                this.complexity
-            );
-            if (check.success) {
-                const blockHash = check.hash.toString("base64");
-                this.currentBlock.header.hash = blockHash;
-                this.emit("mined", {
-                    block: this.currentBlock,
-                    complexity: this.complexity,
-                });
-                this.currentBlock = null;
-            } else {
-                ++this.nonce;
-            }
-        }
-        setImmediate(this.mine.bind(this));
-    }
-}
 
 export class BlockchainMiner implements IBlockchainMiner {
     private keypair: KeyPairKeyObjectResult;

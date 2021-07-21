@@ -85,20 +85,24 @@ import BlockchainDataFactory from "./BlockchainDataFactory/BlockchainDataFactory
 
 /////////////////////////////
 
-const kp = genKeyPair();
-const dest = genKeyPair();
+const acc1 = genKeyPair();
+const acc2 = genKeyPair();
 
 const node = new Node(
     new BlockchainDataFactory(),
     new NodeProtocol(new NodeNet())
 );
 
-const miner = node.createMiner(kp);
+const miner1 = node.createMiner(acc1);
+const miner2 = node.createMiner(acc2);
 
-miner.startMining();
+miner1.startMining();
+miner2.startMining();
 
-const wallet = node.createWallet(kp);
+const wallet1 = node.createWallet(acc1);
+const wallet2 = node.createWallet(acc2);
+
 setInterval(() => {
-    wallet.submitTransaction(dest.publicKey, 1, 0);
-    wallet.submitTransaction(dest.publicKey, 1, 0);
-}, 15000);
+    wallet1.submitTransaction(acc2.publicKey, 1, 1);
+    wallet2.submitTransaction(acc1.publicKey, 1, 1);
+}, 20000);

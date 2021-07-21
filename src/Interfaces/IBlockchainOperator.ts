@@ -46,7 +46,7 @@ export interface IBlockchainOperator {
         info: TransactionInfo,
         privateKey: KeyObject,
         chain: unknown[],
-        txPool: unknown[]
+        txpool: unknown[]
     ): unknown;
 
     createBlockTemplate(

@@ -40,22 +40,22 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
         return validation;
     }
 
-    private logTxPool(msg: string) {
-        console.log(
-            msg,
-            JSON.stringify(
-                this.txpool.map((el) => el.header.signature),
-                null,
-                4
-            )
-        );
-    }
+    // private logTxPool(msg: string) {
+    //     console.log(
+    //         msg,
+    //         JSON.stringify(
+    //             this.txpool.map((el) => el.header.signature),
+    //             null,
+    //             4
+    //         )
+    //     );
+    // }
 
     // updates the chain state and updates the transaction
     // cache to remove the ones that are included inside the blocks
     // that changed
     setChainState(chain: BlockType[]): void {
-        this.logTxPool("BEFORE");
+        // this.logTxPool("BEFORE");
         const firstChangingBlock: BlockType | undefined = chain.find(
             (block, index) => {
                 if (index >= this.chain.length) return true;
@@ -74,7 +74,7 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
             this.chain.length - changeIndex,
             ...chainToAppend
         );
-        this.logTxPool("AFTER");
+        // this.logTxPool("AFTER");
         this.emit("change");
         storage.saveBlockchain(this.chain);
     }

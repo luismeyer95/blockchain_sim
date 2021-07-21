@@ -7,6 +7,7 @@ import { BlockchainMiner } from "./BlockchainMiner";
 import BlockchainWallet from "./BlockchainWallet";
 import { KeyPairKeyObjectResult } from "crypto";
 import IBlockchainState from "src/Interfaces/IBlockchainState";
+import { BlockchainForkedMiner } from "./BlockchainForkedMiner";
 
 export default class BlockchainDataFactory implements IBlockchainDataFactory {
     constructor() {}
@@ -27,6 +28,7 @@ export default class BlockchainDataFactory implements IBlockchainDataFactory {
         state: IBlockchainState
     ) {
         return new BlockchainMiner(keypair, state as BlockchainState);
+        // return new BlockchainForkedMiner(keypair, state as BlockchainState);
     }
 
     createStateInstance() {
