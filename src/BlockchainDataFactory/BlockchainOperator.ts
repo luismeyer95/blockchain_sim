@@ -217,9 +217,9 @@ export class BlockchainOperator implements IBlockchainOperator {
                 hash: "",
             },
             payload: {
+                index,
                 timestamp: Date.now(),
                 nonce: 0,
-                index,
                 previous_hash,
                 coinbase,
                 txs,
@@ -310,7 +310,8 @@ export class BlockchainOperator implements IBlockchainOperator {
         for (const block of revChain) {
             if (block.payload.coinbase.payload.to.address === publicKey)
                 return block.payload.coinbase.payload.to;
-            for (const tx of block.payload.txs) {
+            for (let i = block.payload.txs.length - 1; i >= 0; --i) {
+                const tx = block.payload.txs[i];
                 if (tx.payload.from.address === publicKey)
                     return tx.payload.from;
                 if (tx.payload.to.address === publicKey) return tx.payload.to;

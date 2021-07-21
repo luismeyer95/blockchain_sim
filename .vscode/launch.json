@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "node",
+            "type": "pwa-node",
             "request": "launch",
             "runtimeExecutable": "node",
             "runtimeArgs": [
@@ -22,8 +22,21 @@
             // "outFiles": ["${workspaceFolder}/build/main.js"],
             "env": {
                 "TS_NODE_PROJECT": "${workspaceFolder}/tsconfig.json",
-                "NODE_PATH": "."
-            }
+                "NODE_PATH": ".",
+                "PWD": "${workspaceRoot}"
+            },
+            // "internalConsoleOptions": "openOnSessionStart",
+            "skipFiles": ["<node_internals>/**", "node_modules/**"],
+            "autoAttachChildProcesses": true,
+            "outputCapture": "std",
+            "console": "integratedTerminal"
         }
+        // {
+        //     "name": "Attach to Process",
+        //     "type": "node",
+        //     "request": "attach",
+        //     "port": 14321,
+        //     "outputCapture": "std"
+        // }
     ]
 }
