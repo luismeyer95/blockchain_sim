@@ -5,6 +5,9 @@ import { CustomSet } from "src/Utils/CustomSet";
 import { BlockchainOperator } from "./BlockchainOperator";
 import { TransactionValidationResult } from "src/Interfaces/IBlockchainState";
 import EventEmitter from "events";
+import { BlockchainStorage } from "src/BlockchainDataFactory/BlockchainStorage";
+
+const storage = new BlockchainStorage();
 
 export class BlockchainState extends EventEmitter implements IBlockchainState {
     private operator: BlockchainOperator = new BlockchainOperator();
@@ -37,10 +40,22 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
         return validation;
     }
 
+    private logTxPool(msg: string) {
+        console.log(
+            msg,
+            JSON.stringify(
+                this.txpool.map((el) => el.header.signature),
+                null,
+                4
+            )
+        );
+    }
+
     // updates the chain state and updates the transaction
     // cache to remove the ones that are included inside the blocks
     // that changed
     setChainState(chain: BlockType[]): void {
+        this.logTxPool("BEFORE");
         const firstChangingBlock: BlockType | undefined = chain.find(
             (block, index) => {
                 if (index >= this.chain.length) return true;
@@ -59,11 +74,13 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
             this.chain.length - changeIndex,
             ...chainToAppend
         );
+        this.logTxPool("AFTER");
         this.emit("change");
+        storage.saveBlockchain(this.chain);
     }
 
     private removeBlockTransactionsFromTxPool(block: BlockType) {
-        this.txpool.filter((tx) => {
+        this.txpool = this.txpool.filter((tx) => {
             const found = block.payload.txs.find(
                 (btx) => btx.header.signature === tx.header.signature
             );

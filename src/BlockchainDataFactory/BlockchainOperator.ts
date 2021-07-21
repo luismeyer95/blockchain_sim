@@ -150,7 +150,7 @@ export class BlockchainOperator implements IBlockchainOperator {
             },
             payload: txPayload,
         };
-        this.verifyTransaction(tx, revChain, txPool);
+        // this.verifyTransaction(tx, revChain, txPool);
         // console.log(JSON.stringify(tx, null, 4));
         // process.exit(0);
         return tx;
@@ -476,7 +476,10 @@ export class BlockchainOperator implements IBlockchainOperator {
         cur: AccountOperationType
     ) {
         if (prev.address != cur.address) throw new Error("different address");
-        if (prev.op_nonce + 1 !== cur.op_nonce) throw new Error("bad op nonce");
+        if (prev.op_nonce + 1 !== cur.op_nonce)
+            throw new Error(
+                `bad op nonce: ${prev.op_nonce} + 1 !== ${cur.op_nonce}`
+            );
         if (prev.updated_balance + cur.operation !== cur.updated_balance)
             throw new Error("bad updated balance");
     }
@@ -545,7 +548,7 @@ export class BlockchainOperator implements IBlockchainOperator {
     }
 
     private verifyTransactionSignature(tx: AccountTransactionType) {
-        console.log("CHECKING SIG", tx.header.signature);
+        // console.log("CHECKING SIG", tx.header.signature);
         const sig = Buffer.from(tx.header.signature, "base64");
         const fromKey = deserializeKey(tx.payload.from.address, "public");
         const txPayload = Buffer.from(JSON.stringify(tx.payload));

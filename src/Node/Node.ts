@@ -27,9 +27,6 @@ export class Node {
     private state: IBlockchainState;
     private log: ILogger = log;
 
-    private miners: IBlockchainMiner[] = [];
-    private wallets: IBlockchainWallet[] = [];
-
     constructor(
         factory: IBlockchainDataFactory,
         protocol: INodeProtocol,
@@ -130,10 +127,11 @@ export class Node {
     createWallet(keypair: KeyPairKeyObjectResult): IBlockchainWallet {
         const wallet = this.factory.createWalletInstance(keypair, this.state);
         wallet.onTransaction((tx: unknown) => {
-            this.processReceivedTransaction(tx, () => {
+            const successCallback = () => {
                 const txSerial = JSON.stringify(tx);
                 this.protocol.broadcast("tx", txSerial);
-            });
+            };
+            this.processReceivedTransaction(tx, successCallback);
         });
         return wallet;
     }
@@ -152,8 +150,13 @@ export class Node {
             if (
                 blockValidation.success &&
                 blockValidation.chain.length > chain.length
-            )
+            ) {
+                console.log("~ BLOCK WAS MINED :) ~");
                 this.state.setChainState(blockValidation.chain);
+            } else {
+                console.log("~ BAD BLOCK, REJECTION MOMENT :( ~");
+                process.exit(0);
+            }
         });
         return miner;
     }

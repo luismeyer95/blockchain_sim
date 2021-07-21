@@ -95,12 +95,6 @@ const node = new Node(
 
 const miner = node.createMiner(kp);
 
-miner.onMinedBlock((block) => {
-    console.log("~ BLOCK WAS MINED :) ~");
-    const prettyJson = JSON.stringify(block, null, 4);
-    console.log(prettyJson);
-});
-
 miner.startMining();
 
 const wallet = node.createWallet(kp);

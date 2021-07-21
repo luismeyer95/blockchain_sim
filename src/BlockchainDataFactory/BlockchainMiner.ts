@@ -90,8 +90,6 @@ export class BlockchainMiner implements IBlockchainMiner {
 
     startMining(): void {
         if (this.worker) throw new Error("worker is already mining");
-        if (!this.keypair)
-            throw new Error("cannot mine without a miner keypair");
         this.worker = fork("./src/BlockchainDataFactory/pow_process.ts", [], {
             execArgv: ["-r", "ts-node/register"],
         });
