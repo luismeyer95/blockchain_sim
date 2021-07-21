@@ -31,8 +31,8 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
     // adds a tx to the cached txs, to be included inside the block.
     addTransaction(tx: AccountTransactionType): TransactionValidationResult {
         const validation = this.operator.validateTransaction(
-            this.chain,
             tx,
+            this.chain,
             this.txpool
         );
         if (validation.success) this.txpool.push(tx);

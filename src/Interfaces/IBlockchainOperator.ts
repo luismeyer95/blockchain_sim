@@ -34,9 +34,9 @@ export interface IBlockchainOperator {
     ): BlockRangeValidationResult;
 
     validateTransaction(
-        chain: unknown[],
         tx: unknown,
-        txPool: unknown[]
+        chain: unknown[],
+        txpool: unknown[]
     ): TransactionValidationResult;
 
     getTransactionShapeValidator(): z.ZodAny;
@@ -51,7 +51,7 @@ export interface IBlockchainOperator {
 
     createBlockTemplate(
         keypair: KeyPairKeyObjectResult,
-        txs: unknown[],
-        chain: unknown[]
+        chain: unknown[],
+        txpool: unknown[]
     ): unknown;
 }

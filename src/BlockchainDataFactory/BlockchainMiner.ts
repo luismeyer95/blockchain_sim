@@ -98,8 +98,8 @@ export class BlockchainMiner implements IBlockchainMiner {
         if (!this.worker) return;
         const blockTemplate: BlockType = this.operator.createBlockTemplate(
             this.keypair,
-            this.state.getTxPoolState(),
-            this.state.getChainState()
+            this.state.getChainState(),
+            this.state.getTxPoolState()
         );
         // TODO: remove hardcoded complexity!!
         this.updateTaskData(blockTemplate, 19);

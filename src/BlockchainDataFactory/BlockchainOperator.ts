@@ -17,7 +17,7 @@ import {
     TransactionInfo,
     TransactionValidationResult,
 } from "src/Interfaces/IBlockchainOperator";
-import _, { fromPairs, last, sum } from "lodash";
+import _, { fromPairs, last, partial, sum } from "lodash";
 import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import { CoinbaseTransactionType } from "./ICoinbaseTransaction";
 
@@ -68,13 +68,13 @@ export class BlockchainOperator implements IBlockchainOperator {
     }
 
     validateTransaction(
-        chain: BlockType[],
         tx: AccountTransactionType,
-        txPool: AccountTransactionType[]
+        chain: BlockType[],
+        txpool: AccountTransactionType[]
     ): TransactionValidationResult {
-        const revChain = this.getReverseChain(chain);
+        // const revChain = this.getReverseChain(chain);
         try {
-            this.verifyTransaction(tx, revChain, txPool);
+            this.verifyTransaction(tx, chain, txpool);
         } catch (err) {
             return {
                 success: false,
@@ -87,11 +87,11 @@ export class BlockchainOperator implements IBlockchainOperator {
     private createAccountOperation(
         publicKey: KeyObject,
         operation: number,
-        revChain: BlockType[],
-        txPool: AccountTransactionType[]
+        chain: BlockType[],
+        txpool: AccountTransactionType[]
     ): AccountOperationType {
         const address = serializeKey(publicKey);
-        const res = this.retrieveLastAccountOperationInTxPool(address, txPool);
+        const res = this.retrieveLastAccountOperationInTxPool(address, txpool);
         if (res) {
             return {
                 address,
@@ -100,7 +100,7 @@ export class BlockchainOperator implements IBlockchainOperator {
                 updated_balance: res.op.updated_balance + operation,
             };
         }
-        const result = this.retrieveLastAccountOperation(address, revChain);
+        const result = this.retrieveLastAccountOperation(address, chain);
         if (result) {
             return {
                 address,
@@ -122,21 +122,21 @@ export class BlockchainOperator implements IBlockchainOperator {
         info: TransactionInfo,
         privateKey: KeyObject,
         chain: BlockType[],
-        txPool: AccountTransactionType[]
+        txpool: AccountTransactionType[]
     ): AccountTransactionType {
-        const revChain = this.getReverseChain(chain);
+        // const revChain = this.getReverseChain(chain);
         const destOperation: AccountOperationType = this.createAccountOperation(
             info.to,
             info.amount,
-            revChain,
-            txPool
+            chain,
+            txpool
         );
         const fromMovement = -info.amount - info.fee;
         const fromOperation = this.createAccountOperation(
             info.from,
             fromMovement,
-            revChain,
-            txPool
+            chain,
+            txpool
         );
         const txPayload = {
             from: fromOperation,
@@ -150,9 +150,6 @@ export class BlockchainOperator implements IBlockchainOperator {
             },
             payload: txPayload,
         };
-        // this.verifyTransaction(tx, revChain, txPool);
-        // console.log(JSON.stringify(tx, null, 4));
-        // process.exit(0);
         return tx;
     }
 
@@ -165,20 +162,20 @@ export class BlockchainOperator implements IBlockchainOperator {
 
     private createCoinbaseTransaction(
         keypair: KeyPairKeyObjectResult,
-        txs: AccountTransactionType[],
-        chain: BlockType[]
+        chain: BlockType[],
+        txpool: AccountTransactionType[]
     ): CoinbaseTransactionType {
-        const sumFees = txs.reduce((acc, el) => {
+        const sumFees = txpool.reduce((acc, el) => {
             return acc + el.payload.miner_fee;
         }, 0);
         // TODO: remove hardcoded!!
         const blockReward = 10;
-        const revChain = this.getReverseChain(chain);
+        // const revChain = this.getReverseChain(chain);
         const to = this.createAccountOperation(
             keypair.publicKey,
             sumFees + blockReward,
-            revChain,
-            txs
+            chain,
+            txpool
         );
         const payload = {
             to,
@@ -198,10 +195,10 @@ export class BlockchainOperator implements IBlockchainOperator {
 
     createBlockTemplate(
         keypair: KeyPairKeyObjectResult,
-        txs: AccountTransactionType[],
-        chain: BlockType[]
+        chain: BlockType[],
+        txpool: AccountTransactionType[]
     ): BlockType {
-        const coinbase = this.createCoinbaseTransaction(keypair, txs, chain);
+        const coinbase = this.createCoinbaseTransaction(keypair, chain, txpool);
         const lastBlock = this.getLastBlock(chain);
         let index = 0;
         let previous_hash: string | null = "";
@@ -222,7 +219,7 @@ export class BlockchainOperator implements IBlockchainOperator {
                 nonce: 0,
                 previous_hash,
                 coinbase,
-                txs,
+                txs: txpool,
             },
         };
     }
@@ -252,7 +249,8 @@ export class BlockchainOperator implements IBlockchainOperator {
     }
 
     private verifyBlock(chain: BlockType[], block: BlockType) {
-        const revChain = this.getReverseChain(chain, block.payload.index);
+        // const revChain = this.getReverseChain(chain, block.payload.index);
+        const partialChain = chain.slice(0, block.payload.index);
 
         // TODO: REMOVE HARDCODED COMPLEXITY!!
         this.verifyBlockPayloadHash(block, 19);
@@ -262,40 +260,34 @@ export class BlockchainOperator implements IBlockchainOperator {
         // this.verifyNoDupeRefWithinBlock(block);
         this.verifyOperationAgainstPoolOrChain(
             block.payload.coinbase.payload.to,
-            revChain,
+            partialChain,
             block.payload.txs
         );
-        this.verifyBlockTransactions(block, revChain);
+        this.verifyBlockTransactions(block, partialChain);
         // TODO: REMOVE HARDCODED BLOCK REWARD!!
         this.verifyBlockFullRewardBalance(block, 10);
     }
 
-    private verifyOperation(txOp: AccountOperationType, revChain: BlockType[]) {
-        if (txOp.op_nonce === 0) this.verifyZeroNonceOperation(txOp, revChain);
-        else this.verifyNonZeroNonceOperation(txOp, revChain);
+    private verifyOperation(txOp: AccountOperationType, chain: BlockType[]) {
+        if (txOp.op_nonce === 0) this.verifyZeroNonceOperation(txOp, chain);
+        else this.verifyNonZeroNonceOperation(txOp, chain);
     }
 
     private verifyZeroNonceOperation(
         txOp: AccountOperationType,
-        revChain: BlockType[]
+        chain: BlockType[]
     ) {
         if (txOp.operation !== txOp.updated_balance)
             throw new Error("bad first account tx balance");
-        const lastOp = this.retrieveLastAccountOperation(
-            txOp.address,
-            revChain
-        );
+        const lastOp = this.retrieveLastAccountOperation(txOp.address, chain);
         if (lastOp) throw new Error("found prior operation on account");
     }
 
     private verifyNonZeroNonceOperation(
         txOp: AccountOperationType,
-        revChain: BlockType[]
+        chain: BlockType[]
     ) {
-        const lastOp = this.retrieveLastAccountOperation(
-            txOp.address,
-            revChain
-        );
+        const lastOp = this.retrieveLastAccountOperation(txOp.address, chain);
         if (!lastOp)
             throw new Error(
                 "operation nonce is not null but no record of last operation"
@@ -305,9 +297,10 @@ export class BlockchainOperator implements IBlockchainOperator {
 
     private retrieveLastAccountOperation(
         publicKey: string,
-        revChain: BlockType[]
+        chain: BlockType[]
     ): AccountOperationType | null {
-        for (const block of revChain) {
+        for (let i = chain.length - 1; i >= 0; --i) {
+            const block = chain[i];
             if (block.payload.coinbase.payload.to.address === publicKey)
                 return block.payload.coinbase.payload.to;
             for (let i = block.payload.txs.length - 1; i >= 0; --i) {
@@ -429,10 +422,10 @@ export class BlockchainOperator implements IBlockchainOperator {
 
     private verifyTransaction(
         tx: AccountTransactionType,
-        revChain: BlockType[],
-        txPool: AccountTransactionType[]
+        chain: BlockType[],
+        txpool: AccountTransactionType[]
     ) {
-        this.verifyTransactionAgainstPoolOrChain(tx, txPool, revChain);
+        this.verifyTransactionAgainstPoolOrChain(tx, chain, txpool);
     }
 
     // private verifyTransactionAgainstBlockchain(
@@ -486,49 +479,45 @@ export class BlockchainOperator implements IBlockchainOperator {
     }
 
     private verifyTransactionPoolAgainstBlockchain(
-        txPool: AccountTransactionType[],
-        revChain: BlockType[]
+        txpool: AccountTransactionType[],
+        chain: BlockType[]
     ) {
-        _.forEachRight(txPool, (tx, index) => {
+        _.forEachRight(txpool, (tx, index) => {
             this.verifyTransactionAgainstPoolOrChain(
                 tx,
-                txPool.slice(0, index),
-                revChain
+                chain,
+                txpool.slice(0, index)
             );
         });
     }
 
     private verifyTransactionAgainstPoolOrChain(
         tx: AccountTransactionType,
-        txPool: AccountTransactionType[],
-        revChain: BlockType[]
+        chain: BlockType[],
+        txpool: AccountTransactionType[]
     ) {
         this.verifyOperationSign(tx.payload.from, "from");
         this.verifyOperationSign(tx.payload.to, "to");
         this.verifyTransactionOperationsBalance(tx);
         this.verifyNoNegativeBalanceInTransaction(tx);
-        this.verifyOperationAgainstPoolOrChain(
-            tx.payload.from,
-            revChain,
-            txPool
-        );
-        this.verifyOperationAgainstPoolOrChain(tx.payload.to, revChain, txPool);
+        this.verifyOperationAgainstPoolOrChain(tx.payload.from, chain, txpool);
+        this.verifyOperationAgainstPoolOrChain(tx.payload.to, chain, txpool);
         this.verifyTransactionSignature(tx);
     }
 
     private verifyOperationAgainstPoolOrChain(
         op: AccountOperationType,
-        revChain: BlockType[],
-        txPool: AccountTransactionType[]
+        chain: BlockType[],
+        txpool: AccountTransactionType[]
     ) {
         const res = this.retrieveLastAccountOperationInTxPool(
             op.address,
-            txPool
+            txpool
         );
         if (res) {
             this.verifyOperationCongruence(res.op, op);
         } else {
-            this.verifyOperation(op, revChain);
+            this.verifyOperation(op, chain);
         }
     }
 
@@ -571,14 +560,11 @@ export class BlockchainOperator implements IBlockchainOperator {
         if (tx.payload.from.updated_balance < 0) throw err;
     }
 
-    private verifyBlockTransactions(block: BlockType, revChain: BlockType[]) {
+    private verifyBlockTransactions(block: BlockType, chain: BlockType[]) {
         // for (const tx of block.payload.txs) {
         //     this.verifyTransaction(tx, revChain);
         // }
-        this.verifyTransactionPoolAgainstBlockchain(
-            block.payload.txs,
-            revChain
-        );
+        this.verifyTransactionPoolAgainstBlockchain(block.payload.txs, chain);
     }
 
     private verifyBlockFullRewardBalance(
