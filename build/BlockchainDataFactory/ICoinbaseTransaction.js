@@ -20,3 +20,4 @@ exports.CoinbaseTransactionValidator = zod_1.z.object({
         timestamp: zod_1.z.number(),
     }),
 });
+//# sourceMappingURL=ICoinbaseTransaction.js.map

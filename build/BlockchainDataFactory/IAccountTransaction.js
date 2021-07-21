@@ -20,12 +20,8 @@ exports.AccountTransactionValidator = zod_1.z.object({
         // nodes validate that from.operation + sum(to[].operation) + miner_fee === 0
         // source account must have a last_ref!
         from: IAccountOperation_1.AccountOperationValidator,
-        to: zod_1.z.array(IAccountOperation_1.AccountOperationValidator),
+        to: IAccountOperation_1.AccountOperationValidator,
         miner_fee: zod_1.z.number(),
-        // unix time
-        // important: a transaction timestamp older than the last mined
-        // block's timestamp should be considered invalid
-        timestamp: zod_1.z.number(),
     }),
 });
 // export interface IAccountTransaction {
@@ -49,3 +45,4 @@ exports.AccountTransactionValidator = zod_1.z.object({
 //         return this.tx.payload.timestamp;
 //     }
 // }
+//# sourceMappingURL=IAccountTransaction.js.map

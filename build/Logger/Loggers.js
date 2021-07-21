@@ -7,3 +7,4 @@ var log = function (data) {
     process.stdout.write(data);
 };
 exports.log = log;
+//# sourceMappingURL=Loggers.js.map

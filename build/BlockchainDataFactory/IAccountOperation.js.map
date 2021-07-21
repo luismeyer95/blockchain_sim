@@ -1,0 +1,1 @@
+{"version":3,"file":"IAccountOperation.js","sourceRoot":"","sources":["../../src/BlockchainDataFactory/IAccountOperation.ts"],"names":[],"mappings":";;;AAAA,2BAAwB;AAiBX,QAAA,yBAAyB,GAAG,OAAC,CAAC,MAAM,CAAC;IAC9C,OAAO,EAAE,OAAC,CAAC,MAAM,EAAE;IACnB,SAAS,EAAE,OAAC,CAAC,MAAM,EAAE;IACrB,QAAQ,EAAE,OAAC,CAAC,MAAM,EAAE;IACpB,eAAe,EAAE,OAAC,CAAC,MAAM,EAAE;CAC9B,CAAC,CAAC"}

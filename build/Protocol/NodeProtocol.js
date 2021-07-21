@@ -30,9 +30,9 @@ var BroadcastValidator = zod_1.z.object({
     payload: zod_1.z.string(),
 });
 var NodeProtocol = /** @class */ (function () {
-    function NodeProtocol(logger, net) {
+    function NodeProtocol(net, logger) {
         var _this = this;
-        this.log = Loggers_1.log;
+        if (logger === void 0) { logger = Loggers_1.log; }
         this.validationMap = [
             [BlocksRequestValidator, this.handleBlocksRequest.bind(this)],
             [BlocksResponseValidator, this.handleBlocksResponse.bind(this)],
@@ -115,3 +115,4 @@ var NodeProtocol = /** @class */ (function () {
     return NodeProtocol;
 }());
 exports.NodeProtocol = NodeProtocol;
+//# sourceMappingURL=NodeProtocol.js.map

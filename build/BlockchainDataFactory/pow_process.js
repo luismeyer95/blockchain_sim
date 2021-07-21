@@ -52,3 +52,4 @@ function sendProof(block) {
         complexity: complexity,
     });
 }
+//# sourceMappingURL=pow_process.js.map

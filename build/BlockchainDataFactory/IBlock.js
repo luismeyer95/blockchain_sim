@@ -31,3 +31,4 @@ exports.BlockValidator = zod_1.z.object({
         txs: zod_1.z.array(IAccountTransaction_1.AccountTransactionValidator),
     }),
 });
+//# sourceMappingURL=IBlock.js.map

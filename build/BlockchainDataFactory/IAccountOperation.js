@@ -5,6 +5,7 @@ var zod_1 = require("zod");
 exports.AccountOperationValidator = zod_1.z.object({
     address: zod_1.z.string(),
     operation: zod_1.z.number(),
-    last_ref: zod_1.z.string().or(zod_1.z.null()),
+    op_nonce: zod_1.z.number(),
     updated_balance: zod_1.z.number(),
 });
+//# sourceMappingURL=IAccountOperation.js.map

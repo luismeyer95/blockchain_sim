@@ -1,9 +1,13 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BlockchainOperator = void 0;
 var IBlock_1 = require("src/BlockchainDataFactory/IBlock");
 var IAccountTransaction_1 = require("src/BlockchainDataFactory/IAccountTransaction");
 var Encryption_1 = require("src/Encryption/Encryption");
+var lodash_1 = __importDefault(require("lodash"));
 var BlockchainOperator = /** @class */ (function () {
     function BlockchainOperator() {
     }
@@ -15,14 +19,13 @@ var BlockchainOperator = /** @class */ (function () {
         if (missingRange)
             return { success: false, missing: missingRange };
         var resultChain = chain.filter(function (block) { return block.payload.index < blocks[0].payload.index; });
-        try {
-            blocks.forEach(function (block) {
-                _this.tryAddBlock(resultChain, block);
-            });
-        }
-        catch (_a) {
-            return { success: false, missing: null };
-        }
+        // try {
+        blocks.forEach(function (block) {
+            _this.tryAddBlock(resultChain, block);
+        });
+        // } catch {
+        // return { success: false, missing: null };
+        // }
         return {
             success: true,
             chain: resultChain,
@@ -34,10 +37,10 @@ var BlockchainOperator = /** @class */ (function () {
     BlockchainOperator.prototype.getBlockShapeValidator = function () {
         return IBlock_1.BlockValidator;
     };
-    BlockchainOperator.prototype.validateTransaction = function (chain, tx) {
+    BlockchainOperator.prototype.validateTransaction = function (chain, tx, txPool) {
         var revChain = this.getReverseChain(chain);
         try {
-            this.verifyTransaction(tx, revChain);
+            this.verifyTransaction(tx, revChain, txPool);
         }
         catch (err) {
             return {
@@ -47,35 +50,43 @@ var BlockchainOperator = /** @class */ (function () {
         }
         return { success: true };
     };
-    BlockchainOperator.prototype.createAccountOperation = function (publicKey, operation, revChain) {
+    BlockchainOperator.prototype.createAccountOperation = function (publicKey, operation, revChain, txPool) {
         var address = Encryption_1.serializeKey(publicKey);
+        var res = this.retrieveLastAccountOperationInTxPool(address, txPool);
+        if (res) {
+            return {
+                address: address,
+                operation: operation,
+                op_nonce: res.op.op_nonce + 1,
+                updated_balance: res.op.updated_balance + operation,
+            };
+        }
         var result = this.retrieveLastAccountOperation(address, revChain);
-        var last_ref = result ? result.ref : null;
-        var updated_balance = result
-            ? result.op.updated_balance + operation
-            : operation;
+        if (result) {
+            return {
+                address: address,
+                operation: operation,
+                op_nonce: result.op_nonce + 1,
+                updated_balance: result.updated_balance + operation,
+            };
+        }
         return {
             address: address,
             operation: operation,
-            last_ref: last_ref,
-            updated_balance: updated_balance,
+            op_nonce: 0,
+            updated_balance: operation,
         };
     };
     // verify sum(to[].amount) + fee against account funds
-    BlockchainOperator.prototype.createTransaction = function (chain, info, privateKey) {
-        var _this = this;
+    BlockchainOperator.prototype.createTransaction = function (info, privateKey, chain, txPool) {
         var revChain = this.getReverseChain(chain);
-        var destOperations = info.to.map(function (destOp) {
-            return _this.createAccountOperation(destOp.address, destOp.amount, revChain);
-        });
-        var fromMovement = destOperations.reduce(function (acc, el) { return acc - el.operation; }, 0) -
-            info.fee;
-        var fromOperation = this.createAccountOperation(info.from.address, fromMovement, revChain);
+        var destOperation = this.createAccountOperation(info.to, info.amount, revChain, txPool);
+        var fromMovement = -info.amount - info.fee;
+        var fromOperation = this.createAccountOperation(info.from, fromMovement, revChain, txPool);
         var txPayload = {
             from: fromOperation,
-            to: destOperations,
+            to: destOperation,
             miner_fee: info.fee,
-            timestamp: Date.now(),
         };
         var txPayloadBuffer = Buffer.from(JSON.stringify(txPayload));
         var tx = {
@@ -84,7 +95,9 @@ var BlockchainOperator = /** @class */ (function () {
             },
             payload: txPayload,
         };
-        this.verifyTransaction(tx, revChain);
+        // this.verifyTransaction(tx, revChain, txPool);
+        // console.log(JSON.stringify(tx, null, 4));
+        // process.exit(0);
         return tx;
     };
     BlockchainOperator.prototype.getLastBlock = function (chain) {
@@ -97,21 +110,24 @@ var BlockchainOperator = /** @class */ (function () {
         var sumFees = txs.reduce(function (acc, el) {
             return acc + el.payload.miner_fee;
         }, 0);
+        // TODO: remove hardcoded!!
         var blockReward = 10;
         var revChain = this.getReverseChain(chain);
-        var to = this.createAccountOperation(keypair.publicKey, sumFees + blockReward, revChain);
+        var to = this.createAccountOperation(keypair.publicKey, sumFees + blockReward, revChain, txs);
         var payload = {
-            timestamp: Date.now(),
             to: to,
+            timestamp: Date.now(),
         };
         var payloadBuf = Buffer.from(JSON.stringify(payload));
-        var signature = Encryption_1.sign(payloadBuf, keypair.privateKey).toString("base64");
-        return {
+        var signatureBuf = Encryption_1.sign(payloadBuf, keypair.privateKey);
+        var signature = signatureBuf.toString("base64");
+        var coinbase = {
             header: {
                 signature: signature,
             },
             payload: payload,
         };
+        return coinbase;
     };
     BlockchainOperator.prototype.createBlockTemplate = function (keypair, txs, chain) {
         var coinbase = this.createCoinbaseTransaction(keypair, txs, chain);
@@ -162,21 +178,49 @@ var BlockchainOperator = /** @class */ (function () {
     BlockchainOperator.prototype.verifyBlock = function (chain, block) {
         var revChain = this.getReverseChain(chain, block.payload.index);
         // TODO: REMOVE HARDCODED COMPLEXITY!!
-        this.verifyBlockPayloadHash(block, 23);
+        this.verifyBlockPayloadHash(block, 19);
         this.verifyIncludedPrevBlockHash(chain, block);
         this.verifyBlockCoinbaseSignature(block);
         this.verifyBlockTimestamps(chain, block);
-        this.verifyNoDupeRefWithinBlock(block);
-        this.verifyOperationRef(block.payload.coinbase.payload.to, revChain);
+        // this.verifyNoDupeRefWithinBlock(block);
+        this.verifyOperationAgainstPoolOrChain(block.payload.coinbase.payload.to, revChain, block.payload.txs);
         this.verifyBlockTransactions(block, revChain);
         // TODO: REMOVE HARDCODED BLOCK REWARD!!
         this.verifyBlockFullRewardBalance(block, 10);
     };
-    BlockchainOperator.prototype.verifyOperationRef = function (txOp, revChain) {
-        if (txOp.last_ref === null)
-            this.verifyNullLastRefOperation(txOp, revChain);
+    BlockchainOperator.prototype.verifyOperation = function (txOp, revChain) {
+        if (txOp.op_nonce === 0)
+            this.verifyZeroNonceOperation(txOp, revChain);
         else
-            this.verifyNonNullLastRefOperation(txOp, revChain);
+            this.verifyNonZeroNonceOperation(txOp, revChain);
+    };
+    BlockchainOperator.prototype.verifyZeroNonceOperation = function (txOp, revChain) {
+        if (txOp.operation !== txOp.updated_balance)
+            throw new Error("bad first account tx balance");
+        var lastOp = this.retrieveLastAccountOperation(txOp.address, revChain);
+        if (lastOp)
+            throw new Error("found prior operation on account");
+    };
+    BlockchainOperator.prototype.verifyNonZeroNonceOperation = function (txOp, revChain) {
+        var lastOp = this.retrieveLastAccountOperation(txOp.address, revChain);
+        if (!lastOp)
+            throw new Error("operation nonce is not null but no record of last operation");
+        this.verifyOperationCongruence(lastOp, txOp);
+    };
+    BlockchainOperator.prototype.retrieveLastAccountOperation = function (publicKey, revChain) {
+        for (var _i = 0, revChain_1 = revChain; _i < revChain_1.length; _i++) {
+            var block = revChain_1[_i];
+            if (block.payload.coinbase.payload.to.address === publicKey)
+                return block.payload.coinbase.payload.to;
+            for (var _a = 0, _b = block.payload.txs; _a < _b.length; _a++) {
+                var tx = _b[_a];
+                if (tx.payload.from.address === publicKey)
+                    return tx.payload.from;
+                if (tx.payload.to.address === publicKey)
+                    return tx.payload.to;
+            }
+        }
+        return null;
     };
     BlockchainOperator.prototype.verifyBlockPayloadHash = function (block, complexity) {
         var payloadString = JSON.stringify(block.payload);
@@ -208,16 +252,22 @@ var BlockchainOperator = /** @class */ (function () {
     };
     BlockchainOperator.prototype.verifyBlockTimestamps = function (chain, block) {
         var prevBlock = this.getPreviousBlock(chain, block);
+        var now = Date.now();
+        var blockStamp = block.payload.timestamp;
+        var coinbaseStamp = block.payload.coinbase.payload.timestamp;
+        var blockCheck, coinbaseCheck;
         if (prevBlock) {
-            var blockCheck = prevBlock.payload.timestamp < block.payload.timestamp &&
-                block.payload.timestamp < Date.now();
-            var coinbaseTimestamp = block.payload.coinbase.payload.timestamp;
-            var coinbaseCheck = prevBlock.payload.timestamp < coinbaseTimestamp &&
-                coinbaseTimestamp < Date.now();
-            if (!blockCheck || !coinbaseCheck)
-                throw new Error("bad block timestamps");
+            var prevBlockStamp = prevBlock.payload.timestamp;
+            blockCheck = prevBlockStamp < blockStamp && blockStamp < now;
+            coinbaseCheck =
+                prevBlockStamp < coinbaseStamp && coinbaseStamp < now;
         }
-        throw new Error("error: did not check for block continuity");
+        else {
+            blockCheck = blockStamp < now;
+            coinbaseCheck = coinbaseStamp < now;
+        }
+        if (!blockCheck || !coinbaseCheck)
+            throw new Error("bad block timestamps");
     };
     BlockchainOperator.prototype.getPreviousBlock = function (chain, block) {
         var blockIndex = block.payload.index;
@@ -226,27 +276,12 @@ var BlockchainOperator = /** @class */ (function () {
         return chain[blockIndex - 1];
     };
     BlockchainOperator.prototype.verifyBlockCoinbaseSignature = function (block) {
-        var coinbaseSig = Buffer.from(block.payload.coinbase.header.signature, "base64");
-        var publicKeyMiner = Encryption_1.deserializeKey(block.payload.coinbase.payload.to.address, "public");
-        var coinbasePayload = Buffer.from(JSON.stringify(block.payload.coinbase.payload));
+        var coinbase = block.payload.coinbase;
+        var coinbaseSig = Buffer.from(coinbase.header.signature, "base64");
+        var publicKeyMiner = Encryption_1.deserializeKey(coinbase.payload.to.address, "public");
+        var coinbasePayload = Buffer.from(JSON.stringify(coinbase.payload));
         if (!Encryption_1.verify(coinbasePayload, publicKeyMiner, coinbaseSig))
             throw new Error("bad block coinbase signature");
-    };
-    // throws
-    BlockchainOperator.prototype.verifyLastRefNotAlreadyReferenced = function (publicKey, lastRef, revChain) {
-        for (var _i = 0, revChain_1 = revChain; _i < revChain_1.length; _i++) {
-            var block = revChain_1[_i];
-            for (var _a = 0, _b = block.payload.txs; _a < _b.length; _a++) {
-                var tx = _b[_a];
-                this.verifyNoDupeLastRefInBlockchainTx(tx, publicKey, lastRef);
-            }
-        }
-    };
-    BlockchainOperator.prototype.verifyNoDupeLastRefInBlockchainTx = function (tx, publicKey, lastRef) {
-        tx.payload.to.forEach(function (output) {
-            if (output.address === publicKey && output.last_ref === lastRef)
-                throw new Error("last_ref is already referenced");
-        });
     };
     BlockchainOperator.prototype.getReverseChain = function (chain, stopIndex) {
         if (stopIndex === void 0) { stopIndex = chain.length; }
@@ -255,131 +290,137 @@ var BlockchainOperator = /** @class */ (function () {
             .filter(function (block) { return block.payload.index < stopIndex; })
             .reverse();
     };
-    BlockchainOperator.prototype.retrieveLastAccountOperation = function (publicKey, revChain) {
-        for (var _i = 0, revChain_2 = revChain; _i < revChain_2.length; _i++) {
-            var block = revChain_2[_i];
-            if (block.payload.coinbase.payload.to.address === publicKey)
-                return {
-                    op: block.payload.coinbase.payload.to,
-                    ref: block.payload.coinbase.header.signature,
-                };
-            for (var _a = 0, _b = block.payload.txs; _a < _b.length; _a++) {
-                var tx = _b[_a];
-                if (tx.payload.from.address === publicKey)
-                    return { op: tx.payload.from, ref: tx.header.signature };
-                for (var _c = 0, _d = tx.payload.to; _c < _d.length; _c++) {
-                    var output = _d[_c];
-                    if (output.address === publicKey)
-                        return { op: output, ref: tx.header.signature };
-                }
-            }
-        }
-        return null;
-    };
-    BlockchainOperator.prototype.verifyNoDupeRefWithinBlock = function (block) {
-        var keyRefPairs = [
-            block.payload.coinbase.payload.to.last_ref +
-                block.payload.coinbase.payload.to.address,
-        ];
-        block.payload.txs.forEach(function (tx) {
-            keyRefPairs.push(tx.payload.from.last_ref + tx.payload.from.address);
-            var toPairs = tx.payload.to.map(function (op) { return op.last_ref + op.address; });
-            keyRefPairs.push.apply(keyRefPairs, toPairs);
-        });
-        var keyRefPairSet = new Set(keyRefPairs);
-        if (keyRefPairs.length !== keyRefPairSet.size)
-            throw new Error("found dupe (last_ref, address) pair within block operations");
-    };
-    BlockchainOperator.prototype.verifyNoPriorTxOnAccount = function (publicKey, revChain) {
-        for (var _i = 0, revChain_3 = revChain; _i < revChain_3.length; _i++) {
-            var block = revChain_3[_i];
-            if (block.payload.coinbase.payload.to.address === publicKey)
-                throw new Error("found prior tx on account");
-            for (var _a = 0, _b = block.payload.txs; _a < _b.length; _a++) {
-                var tx = _b[_a];
-                for (var _c = 0, _d = tx.payload.to; _c < _d.length; _c++) {
-                    var output = _d[_c];
-                    if (output.address === publicKey)
-                        throw new Error("found prior tx on account");
-                }
-            }
-        }
-    };
-    BlockchainOperator.prototype.verifyNullLastRefOperation = function (txOp, revChain) {
-        this.verifyNoPriorTxOnAccount(txOp.address, revChain);
-        if (txOp.operation !== txOp.updated_balance)
-            throw new Error("bad first account tx balance");
-    };
-    BlockchainOperator.prototype.verifyNonNullLastRefOperation = function (txOp, revChain) {
-        this.verifyLastRefNotAlreadyReferenced(txOp.address, txOp.last_ref, revChain);
-        var result = this.retrieveLastAccountOperation(txOp.address, revChain);
-        if (!result)
-            throw new Error("operation ref is not null but no record of last operation");
-        var lastOp = result.op, ref = result.ref;
-        if (ref !== txOp.last_ref)
-            throw new Error("bad last ref");
-        if (lastOp.updated_balance + txOp.operation !== txOp.updated_balance)
-            throw new Error("bad account balance update");
-    };
+    // private verifyNoDupeRefWithinBlock(block: BlockType) {
+    //     const keyRefPairs = [
+    //         block.payload.coinbase.payload.to.last_ref +
+    //             block.payload.coinbase.payload.to.address,
+    //     ];
+    //     block.payload.txs.forEach((tx) => {
+    //         keyRefPairs.push(
+    //             tx.payload.from.last_ref + tx.payload.from.address
+    //         );
+    //         const toPairs = tx.payload.to.map((op) => op.last_ref + op.address);
+    //         keyRefPairs.push(...toPairs);
+    //     });
+    //     const keyRefPairSet = new Set(keyRefPairs);
+    //     if (keyRefPairs.length !== keyRefPairSet.size)
+    //         throw new Error(
+    //             "found dupe (last_ref, address) pair within block operations"
+    //         );
+    // }
     BlockchainOperator.prototype.verifyOperationSign = function (txOp, type) {
         if ((txOp.operation < 0 && type === "to") ||
             (txOp.operation > 0 && type === "from"))
             throw new Error("bad sign for tx operation field");
     };
-    BlockchainOperator.prototype.verifyTransaction = function (tx, revChain) {
+    BlockchainOperator.prototype.verifyTransaction = function (tx, revChain, txPool) {
+        this.verifyTransactionAgainstPoolOrChain(tx, txPool, revChain);
+    };
+    // private verifyTransactionAgainstBlockchain(
+    //     tx: AccountTransactionType,
+    //     revChain: BlockType[]
+    // ) {
+    //     // if (tx.payload.from.op_nonce === 0)
+    //     //     throw new Error("source account of tx has null last ref");
+    //     this.verifyOperation(tx.payload.from, revChain);
+    //     this.verifyOperation(tx.payload.to, revChain);
+    //     this.verifyOperationSign(tx.payload.from, "from");
+    //     this.verifyTransactionSignature(tx);
+    //     this.verifyTransactionOperationsBalance(tx);
+    //     this.verifyNoNegativeBalanceInTransaction(tx);
+    //     this.verifyOperationSign(tx.payload.to, "to");
+    // }
+    // private verifyTransactionAgainstTrustedPool(
+    //     tx: AccountTransactionType,
+    //     txPool: AccountTransactionType[]
+    // ) {
+    //     this.verifyOperationAgainstTrustedPool(tx.payload.from, txPool);
+    //     this.verifyOperationAgainstTrustedPool(tx.payload.to, txPool);
+    // }
+    // private verifyOperationAgainstTrustedPool(
+    //     op: AccountOperationType,
+    //     txPool: AccountTransactionType[]
+    // ) {
+    //     const res = this.retrieveLastAccountOperationInTxPool(
+    //         op.address,
+    //         txPool
+    //     );
+    //     if (res) {
+    //         const { op: lastOp } = res;
+    //         this.verifyOperationCongruence(lastOp, op);
+    //     }
+    // }
+    BlockchainOperator.prototype.verifyOperationCongruence = function (prev, cur) {
+        if (prev.address != cur.address)
+            throw new Error("different address");
+        if (prev.op_nonce + 1 !== cur.op_nonce)
+            throw new Error("bad op nonce: " + prev.op_nonce + " + 1 !== " + cur.op_nonce);
+        if (prev.updated_balance + cur.operation !== cur.updated_balance)
+            throw new Error("bad updated balance");
+    };
+    BlockchainOperator.prototype.verifyTransactionPoolAgainstBlockchain = function (txPool, revChain) {
         var _this = this;
-        if (tx.payload.from.last_ref === null)
-            throw new Error("source account of tx has null last ref");
-        this.verifyNonNullLastRefOperation(tx.payload.from, revChain);
-        this.verifyOperationSign(tx.payload.from, "from");
-        this.verifyTransactionSignature(tx);
-        this.verifyUnicityAcrossDestinationAccountsOfTx(tx);
-        this.verifyTransactionOperationsBalance(tx);
-        this.verifyNoNegativeBalanceInTransaction(tx);
-        tx.payload.to.forEach(function (txOp) {
-            _this.verifyOperationSign(txOp, "to");
-            if (txOp.last_ref === null) {
-                _this.verifyNullLastRefOperation(txOp, revChain);
-            }
-            else {
-                _this.verifyNonNullLastRefOperation(txOp, revChain);
-            }
+        lodash_1.default.forEachRight(txPool, function (tx, index) {
+            _this.verifyTransactionAgainstPoolOrChain(tx, txPool.slice(0, index), revChain);
         });
     };
+    BlockchainOperator.prototype.verifyTransactionAgainstPoolOrChain = function (tx, txPool, revChain) {
+        this.verifyOperationSign(tx.payload.from, "from");
+        this.verifyOperationSign(tx.payload.to, "to");
+        this.verifyTransactionOperationsBalance(tx);
+        this.verifyNoNegativeBalanceInTransaction(tx);
+        this.verifyOperationAgainstPoolOrChain(tx.payload.from, revChain, txPool);
+        this.verifyOperationAgainstPoolOrChain(tx.payload.to, revChain, txPool);
+        this.verifyTransactionSignature(tx);
+    };
+    BlockchainOperator.prototype.verifyOperationAgainstPoolOrChain = function (op, revChain, txPool) {
+        var res = this.retrieveLastAccountOperationInTxPool(op.address, txPool);
+        if (res) {
+            this.verifyOperationCongruence(res.op, op);
+        }
+        else {
+            this.verifyOperation(op, revChain);
+        }
+    };
+    BlockchainOperator.prototype.retrieveLastAccountOperationInTxPool = function (publicKey, txs) {
+        // reverse iteration
+        var length = txs.length;
+        for (var i = length - 1; i >= 0; --i) {
+            var tx = txs[i];
+            if (tx.payload.from.address === publicKey)
+                return { index: i, op: tx.payload.from };
+            if (tx.payload.to.address === publicKey)
+                return { index: i, op: tx.payload.to };
+        }
+        return null;
+    };
     BlockchainOperator.prototype.verifyTransactionSignature = function (tx) {
+        // console.log("CHECKING SIG", tx.header.signature);
         var sig = Buffer.from(tx.header.signature, "base64");
         var fromKey = Encryption_1.deserializeKey(tx.payload.from.address, "public");
         var txPayload = Buffer.from(JSON.stringify(tx.payload));
         if (!Encryption_1.verify(txPayload, fromKey, sig))
             throw new Error("bad transaction signature");
     };
-    BlockchainOperator.prototype.verifyUnicityAcrossDestinationAccountsOfTx = function (tx) {
-        var addressArr = tx.payload.to.map(function (op) { return op.address; });
-        var addressSet = new Set(addressArr);
-        if (addressArr.length !== addressSet.size) {
-            throw new Error("duplicate address found in tx output operations");
-        }
-    };
     BlockchainOperator.prototype.verifyTransactionOperationsBalance = function (tx) {
-        var destBalance = tx.payload.to.reduce(function (acc, el) { return acc + el.operation; }, 0);
+        var destBalance = tx.payload.to.operation;
         var sourceBalance = tx.payload.from.operation;
-        if (sourceBalance + destBalance + tx.payload.miner_fee !== 0)
-            throw new Error("bad transaction balance");
+        var balance = sourceBalance + destBalance + tx.payload.miner_fee;
+        if (balance !== 0)
+            throw new Error("bad transaction balance: " + balance + " !== 0");
     };
     BlockchainOperator.prototype.verifyNoNegativeBalanceInTransaction = function (tx) {
         var err = new Error("negative balance for transaction");
-        tx.payload.to.forEach(function (op) {
-            if (op.updated_balance < 0)
-                throw err;
-        });
+        if (tx.payload.to.updated_balance < 0)
+            throw err;
         if (tx.payload.from.updated_balance < 0)
             throw err;
     };
     BlockchainOperator.prototype.verifyBlockTransactions = function (block, revChain) {
-        for (var _i = 0, _a = block.payload.txs; _i < _a.length; _i++) {
-            var tx = _a[_i];
-            this.verifyTransaction(tx, revChain);
-        }
+        // for (const tx of block.payload.txs) {
+        //     this.verifyTransaction(tx, revChain);
+        // }
+        this.verifyTransactionPoolAgainstBlockchain(block.payload.txs, revChain);
     };
     BlockchainOperator.prototype.verifyBlockFullRewardBalance = function (block, setBlockReward) {
         var coinbaseOperation = block.payload.coinbase.payload.to.operation;
@@ -390,3 +431,4 @@ var BlockchainOperator = /** @class */ (function () {
     return BlockchainOperator;
 }());
 exports.BlockchainOperator = BlockchainOperator;
+//# sourceMappingURL=BlockchainOperator.js.map
