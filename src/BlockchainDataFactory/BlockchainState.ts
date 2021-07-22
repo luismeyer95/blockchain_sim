@@ -90,10 +90,6 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
                         if (resultChain.length > this.chain.length) {
                             console.log("~ BLOCK WAS MINED :) ~");
                             this.setChainState(resultChain);
-                            // this.protocol.broadcast(
-                            //     "block",
-                            //     JSON.stringify(block)
-                            // );
                             this.events.emit("block", JSON.stringify(block));
                         }
                     },

@@ -21,16 +21,6 @@ import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import { CoinbaseTransactionType } from "./ICoinbaseTransaction";
 import { SuccessErrorCallbacks } from "src/Utils/SuccessErrorCallbacks";
 
-export type BlockRangeValidationResult =
-    | {
-          success: true;
-          chain: BlockType[];
-      }
-    | {
-          success: false;
-          missing: [number, number] | null;
-      };
-
 export class BlockchainOperator implements IBlockchainOperator {
     constructor() {}
 
@@ -39,8 +29,7 @@ export class BlockchainOperator implements IBlockchainOperator {
         blocks: BlockType[],
         callbacks: SuccessErrorCallbacks<BlockType[], [number, number] | null>
     ): void {
-        if (blocks.length === 0)
-            throw new Error("empty block array submission");
+        if (blocks.length === 0) return;
         const missingRange = this.getMissingRange(chain, blocks[0]);
         if (missingRange) {
             callbacks.onError(missingRange);
@@ -58,6 +47,20 @@ export class BlockchainOperator implements IBlockchainOperator {
         //     return;
         // }
         callbacks.onSuccess(resultChain);
+    }
+
+    private getMissingRange(
+        chain: BlockType[],
+        block: BlockType
+    ): [number, number] | null {
+        if (!this.isAppendable(chain, block)) {
+            return [chain.length, block.payload.index];
+        }
+        return null;
+    }
+
+    private isAppendable(chain: BlockType[], block: BlockType) {
+        return block.payload.index <= chain.length;
     }
 
     getTransactionShapeValidator() {
@@ -220,25 +223,6 @@ export class BlockchainOperator implements IBlockchainOperator {
                 txs: txpool,
             },
         };
-    }
-
-    private isAppendable(chain: BlockType[], block: BlockType) {
-        const rangeFirstIndex = block.payload.index;
-        if (chain.length === 0) return block.payload.index === 0;
-        return chain[chain.length - 1].payload.index + 1 === rangeFirstIndex;
-    }
-
-    private getMissingRange(
-        chain: BlockType[],
-        block: BlockType
-    ): [number, number] | null {
-        if (!this.isAppendable(chain, block)) {
-            const start = chain.length
-                ? chain[chain.length - 1].payload.index
-                : 0;
-            return [start, block.payload.index + 1];
-        }
-        return null;
     }
 
     private tryAddBlock(chain: BlockType[], block: BlockType) {
@@ -425,43 +409,6 @@ export class BlockchainOperator implements IBlockchainOperator {
     ) {
         this.verifyTransactionAgainstPoolOrChain(tx, chain, txpool);
     }
-
-    // private verifyTransactionAgainstBlockchain(
-    //     tx: AccountTransactionType,
-    //     revChain: BlockType[]
-    // ) {
-    //     // if (tx.payload.from.op_nonce === 0)
-    //     //     throw new Error("source account of tx has null last ref");
-    //     this.verifyOperation(tx.payload.from, revChain);
-    //     this.verifyOperation(tx.payload.to, revChain);
-    //     this.verifyOperationSign(tx.payload.from, "from");
-    //     this.verifyTransactionSignature(tx);
-    //     this.verifyTransactionOperationsBalance(tx);
-    //     this.verifyNoNegativeBalanceInTransaction(tx);
-    //     this.verifyOperationSign(tx.payload.to, "to");
-    // }
-
-    // private verifyTransactionAgainstTrustedPool(
-    //     tx: AccountTransactionType,
-    //     txPool: AccountTransactionType[]
-    // ) {
-    //     this.verifyOperationAgainstTrustedPool(tx.payload.from, txPool);
-    //     this.verifyOperationAgainstTrustedPool(tx.payload.to, txPool);
-    // }
-
-    // private verifyOperationAgainstTrustedPool(
-    //     op: AccountOperationType,
-    //     txPool: AccountTransactionType[]
-    // ) {
-    //     const res = this.retrieveLastAccountOperationInTxPool(
-    //         op.address,
-    //         txPool
-    //     );
-    //     if (res) {
-    //         const { op: lastOp } = res;
-    //         this.verifyOperationCongruence(lastOp, op);
-    //     }
-    // }
 
     private verifyOperationCongruence(
         prev: AccountOperationType,

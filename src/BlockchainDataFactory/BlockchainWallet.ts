@@ -7,7 +7,7 @@ import IBlockchainWallet from "src/Interfaces/IBlockchainWallet";
 import { EventEmitter } from "stream";
 import { BlockchainState } from "./BlockchainState";
 
-export default class BlockchainWallet implements IBlockchainWallet {
+export class BlockchainWallet implements IBlockchainWallet {
     private operator: BlockchainOperator = new BlockchainOperator();
     private events: EventEmitter = new EventEmitter();
     private keypair: KeyPairKeyObjectResult;

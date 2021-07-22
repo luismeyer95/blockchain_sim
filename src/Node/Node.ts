@@ -20,11 +20,8 @@ import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import IBlockchainState from "src/Interfaces/IBlockchainState";
 
 export class Node {
-    private protocol: INodeProtocol;
-    private factory: IBlockchainDataFactory;
-    private chainOperator: IBlockchainOperator;
-    private chain: unknown[];
     private state: IBlockchainState;
+    private protocol: INodeProtocol;
     private log: ILogger = log;
 
     constructor(
@@ -65,7 +62,10 @@ export class Node {
             "tx",
             (data: string, peer: string, relay: () => void) => {
                 this.state.addTransaction(data, {
-                    onSuccess: relay,
+                    onSuccess: () => {
+                        this.log(`[node]: valid broadcasted tx append\n`);
+                        relay();
+                    },
                     onError: (message) => {
                         this.log(
                             `[node]: received bad transaction. cause: ${message}\n`
@@ -78,15 +78,15 @@ export class Node {
         this.protocol.onBlocksRequest(
             (range: [number, number], peer: string, respond) => {
                 const chain = this.state.getChainState();
-                const blockRange = chain.slice(range[0], range[1]);
+                const blockRange = chain.slice(range[0], range[1] + 1);
                 const serializedRange = JSON.stringify(blockRange);
                 respond(serializedRange);
             }
         );
     }
 
-    private onMissingBlocks = (missing: [number, number], peer: string) => {
-        this.protocol.requestBlocks(missing, peer, (data: string) => {
+    private onMissingBlocks = (range: [number, number], peer: string) => {
+        this.protocol.requestBlocks(range, peer, (data: string) => {
             this.state.submitBlocks(data, {
                 onSuccess: () => {},
                 onError: () => {},

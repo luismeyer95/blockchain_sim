@@ -3,6 +3,7 @@ import { NodeProtocol } from "src/Protocol/NodeProtocol";
 import INodeProtocol from "src/Interfaces/INodeProtocol";
 import { stdin } from "process";
 import { BlockchainMiner } from "./BlockchainDataFactory/BlockchainMiner";
+import { BlockchainWallet } from "src/BlockchainDataFactory/BlockchainWallet";
 import { BlockchainOperator } from "./BlockchainDataFactory/BlockchainOperator";
 import {
     deserializeKey,
@@ -19,7 +20,8 @@ import { BlockchainStorage } from "./BlockchainDataFactory/BlockchainStorage";
 import { IBlockchainStorage } from "./Interfaces/IBlockchainStorage";
 import { AccountTransactionType } from "./BlockchainDataFactory/IAccountTransaction";
 import { Node } from "src/Node/Node";
-import BlockchainDataFactory from "./BlockchainDataFactory/BlockchainDataFactory";
+import { BlockchainState } from "./BlockchainDataFactory/BlockchainState";
+import _ from "lodash";
 
 // const ptcl: INodeProtocol = new NodeProtocol(log, new NodeNet(log));
 
@@ -88,19 +90,22 @@ import BlockchainDataFactory from "./BlockchainDataFactory/BlockchainDataFactory
 const acc1 = genKeyPair();
 const acc2 = genKeyPair();
 
-const node = new Node(
-    new BlockchainDataFactory(),
-    new NodeProtocol(new NodeNet())
-);
+// const node = new Node(
+//     new BlockchainDataFactory(),
+//     new NodeProtocol(new NodeNet())
+// );
 
-const miner1 = node.createMiner(acc1);
-const miner2 = node.createMiner(acc2);
+const state = new BlockchainState();
+const node = new Node(state, new NodeProtocol(new NodeNet()));
+
+const miner1 = state.createMiner(acc1, BlockchainMiner);
+const miner2 = state.createMiner(acc2, BlockchainMiner);
 
 miner1.startMining();
 miner2.startMining();
 
-const wallet1 = node.createWallet(acc1);
-const wallet2 = node.createWallet(acc2);
+const wallet1 = state.createWallet(acc1, BlockchainWallet);
+const wallet2 = state.createWallet(acc2, BlockchainWallet);
 
 setInterval(() => {
     wallet1.submitTransaction(acc2.publicKey, 1, 1);
