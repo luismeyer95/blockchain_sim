@@ -1,20 +1,33 @@
 import IBlockchainState from "src/Interfaces/IBlockchainState";
-import { AccountTransactionType } from "./IAccountTransaction";
-import { BlockType } from "./IBlock";
+import {
+    AccountTransactionType,
+    AccountTransactionValidator,
+} from "./IAccountTransaction";
+import { BlockType, BlockValidator } from "./IBlock";
 import { CustomSet } from "src/Utils/CustomSet";
 import { BlockchainOperator } from "./BlockchainOperator";
-import { TransactionValidationResult } from "src/Interfaces/IBlockchainState";
 import EventEmitter from "events";
 import { BlockchainStorage } from "src/BlockchainDataFactory/BlockchainStorage";
+import { z } from "zod";
+import { SuccessErrorCallbacks } from "src/Utils/SuccessErrorCallbacks";
+import { KeyPairKeyObjectResult } from "crypto";
+import IBlockchainDataFactory from "src/Interfaces/IBlockchainDataFactory";
+import IBlockchainMiner from "src/Interfaces/IBlockchainMiner";
+import IBlockchainWallet from "src/Interfaces/IBlockchainWallet";
+import ILogger from "src/Logger/ILogger";
+import { log } from "src/Logger/Loggers";
 
 const storage = new BlockchainStorage();
 
 export class BlockchainState extends EventEmitter implements IBlockchainState {
     private operator: BlockchainOperator = new BlockchainOperator();
-    // private events: EventEmitter = new EventEmitter();
+    private events: EventEmitter = new EventEmitter();
+    // private factory: IBlockchainDataFactory;
+
     private txpool: AccountTransactionType[] = [];
     private chain: BlockType[] = [];
     // private log: ILogger;
+    private log: ILogger = log;
 
     constructor() {
         super();
@@ -28,16 +41,141 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
         return this.txpool;
     }
 
+    onLocalBlockAppend(fn: (serializedBlock: string) => unknown) {
+        this.events.on("block", fn);
+    }
+
+    onLocalTransactionAppend(fn: (serializedTx: string) => unknown) {
+        this.events.on("tx", fn);
+    }
+
+    createWallet<Wallet extends IBlockchainWallet>(
+        keypair: KeyPairKeyObjectResult,
+        walletCtor: new (
+            keypair: KeyPairKeyObjectResult,
+            state: BlockchainState
+        ) => Wallet
+    ): IBlockchainWallet {
+        const wallet = new walletCtor(keypair, this);
+        wallet.onTransaction((tx: AccountTransactionType) => {
+            this.addTransaction(tx, {
+                onSuccess: () => {
+                    // const txSerial = JSON.stringify(tx);
+                    // this.protocol.broadcast("tx", txSerial);
+                    this.events.emit("tx", JSON.stringify(tx));
+                },
+                onError: () => {},
+            });
+        });
+        return wallet;
+    }
+
+    createMiner<Miner extends IBlockchainMiner>(
+        keypair: KeyPairKeyObjectResult,
+        minerCtor: new (
+            keypair: KeyPairKeyObjectResult,
+            state: BlockchainState
+        ) => Miner
+    ): IBlockchainMiner {
+        const miner = new minerCtor(keypair, this);
+        miner.onMinedBlock((block: unknown) => {
+            const blockShapeValidation = BlockValidator.safeParse(block);
+            if (!blockShapeValidation.success) return;
+            const chain = this.getChainState();
+            this.operator.validateBlockRange(
+                chain,
+                [blockShapeValidation.data],
+                {
+                    onSuccess: (resultChain) => {
+                        if (resultChain.length > this.chain.length) {
+                            console.log("~ BLOCK WAS MINED :) ~");
+                            this.setChainState(resultChain);
+                            // this.protocol.broadcast(
+                            //     "block",
+                            //     JSON.stringify(block)
+                            // );
+                            this.events.emit("block", JSON.stringify(block));
+                        }
+                    },
+                    onError: (missing) => {
+                        console.log("~ BAD BLOCK, REJECTION MOMENT :( ~");
+                    },
+                }
+            );
+        });
+        return miner;
+    }
+
     // adds a tx to the cached txs, to be included inside the block.
-    addTransaction(tx: AccountTransactionType): TransactionValidationResult {
-        const validation = this.operator.validateTransaction(
-            tx,
-            this.chain,
-            this.txpool
-        );
-        if (validation.success) this.txpool.push(tx);
-        this.emit("change");
-        return validation;
+    addTransaction(
+        input: unknown | string,
+        callbacks: SuccessErrorCallbacks<void, string>
+    ) {
+        try {
+            this.tryAddTransaction(input, callbacks);
+        } catch (err) {
+            callbacks.onError("bad serial");
+        }
+    }
+
+    private tryAddTransaction(
+        input: unknown | string,
+        callbacks: SuccessErrorCallbacks<void, string>
+    ): void {
+        let obj: unknown = input;
+        if (typeof input === "string") {
+            obj = JSON.parse(input);
+        }
+        const txShapeValidation = AccountTransactionValidator.safeParse(obj);
+        if (!txShapeValidation.success) {
+            callbacks.onError("bad object shape");
+            return;
+        }
+        const tx = txShapeValidation.data;
+        this.operator.validateTransaction(tx, this.chain, this.txpool, {
+            onSuccess: () => {
+                this.txpool.push(tx);
+                this.emit("change");
+                callbacks.onSuccess();
+            },
+            onError: callbacks.onError,
+        });
+    }
+
+    submitBlocks(
+        input: unknown | string,
+        callbacks: SuccessErrorCallbacks<BlockType[], [number, number] | null>
+    ): void {
+        try {
+            this.trySubmitBlocks(input, callbacks);
+        } catch (err) {
+            callbacks.onError(null);
+        }
+    }
+
+    private trySubmitBlocks(
+        input: unknown | string,
+        callbacks: SuccessErrorCallbacks<BlockType[], [number, number] | null>
+    ): void {
+        const BlockArrayValidator = z.array(BlockValidator);
+
+        let obj: unknown = input;
+        if (typeof input === "string") {
+            obj = JSON.parse(input);
+        }
+        const blockArrayShapeValidation = BlockArrayValidator.safeParse(obj);
+        if (blockArrayShapeValidation.success) {
+            const blocks = blockArrayShapeValidation.data;
+
+            this.operator.validateBlockRange(this.chain, blocks, {
+                onSuccess: (resultChain) => {
+                    if (resultChain.length > this.chain.length)
+                        this.setChainState(resultChain);
+                    callbacks.onSuccess(resultChain);
+                },
+                onError: callbacks.onError,
+            });
+        } else callbacks.onError(null);
     }
 
     // private logTxPool(msg: string) {

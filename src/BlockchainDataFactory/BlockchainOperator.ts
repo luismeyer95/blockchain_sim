@@ -15,11 +15,11 @@ import {
 import {
     IBlockchainOperator,
     TransactionInfo,
-    TransactionValidationResult,
 } from "src/Interfaces/IBlockchainOperator";
 import _, { fromPairs, last, partial, sum } from "lodash";
 import { KeyObject, KeyPairKeyObjectResult } from "crypto";
 import { CoinbaseTransactionType } from "./ICoinbaseTransaction";
+import { SuccessErrorCallbacks } from "src/Utils/SuccessErrorCallbacks";
 
 export type BlockRangeValidationResult =
     | {
@@ -36,13 +36,16 @@ export class BlockchainOperator implements IBlockchainOperator {
 
     validateBlockRange(
         chain: BlockType[],
-        blocks: BlockType[]
-    ): BlockRangeValidationResult {
+        blocks: BlockType[],
+        callbacks: SuccessErrorCallbacks<BlockType[], [number, number] | null>
+    ): void {
         if (blocks.length === 0)
             throw new Error("empty block array submission");
         const missingRange = this.getMissingRange(chain, blocks[0]);
-        if (missingRange) return { success: false, missing: missingRange };
-
+        if (missingRange) {
+            callbacks.onError(missingRange);
+            return;
+        }
         const resultChain = chain.filter(
             (block) => block.payload.index < blocks[0].payload.index
         );
@@ -51,12 +54,10 @@ export class BlockchainOperator implements IBlockchainOperator {
             this.tryAddBlock(resultChain, block);
         });
         // } catch {
-        // return { success: false, missing: null };
+        //     callbacks.onError(null);
+        //     return;
         // }
-        return {
-            success: true,
-            chain: resultChain,
-        };
+        callbacks.onSuccess(resultChain);
     }
 
     getTransactionShapeValidator() {
@@ -70,18 +71,15 @@ export class BlockchainOperator implements IBlockchainOperator {
     validateTransaction(
         tx: AccountTransactionType,
         chain: BlockType[],
-        txpool: AccountTransactionType[]
-    ): TransactionValidationResult {
-        // const revChain = this.getReverseChain(chain);
+        txpool: AccountTransactionType[],
+        callbacks: SuccessErrorCallbacks<void, string>
+    ): void {
         try {
             this.verifyTransaction(tx, chain, txpool);
+            callbacks.onSuccess();
         } catch (err) {
-            return {
-                success: false,
-                message: err.message,
-            };
+            callbacks.onError(err.message);
         }
-        return { success: true };
     }
 
     private createAccountOperation(
