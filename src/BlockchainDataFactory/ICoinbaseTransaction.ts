@@ -15,10 +15,6 @@ export const CoinbaseTransactionValidator = z.object({
     payload: z.object({
         // operation must be block reward + sum(fees) of containing block
         to: AccountOperationValidator,
-        // unix time
-        // important: a transaction timestamp older than the last mined block's timestamp
-        // should be considered invalid
-        timestamp: z.number(),
     }),
 });
 

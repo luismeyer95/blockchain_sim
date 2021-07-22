@@ -18,6 +18,22 @@ export class BlockchainWallet implements IBlockchainWallet {
         this.state = state;
     }
 
+    getBalance() {
+        const txinfo: TransactionInfo = {
+            from: this.keypair.publicKey,
+            to: this.keypair.publicKey,
+            amount: 0,
+            fee: 0,
+        };
+        const tx = this.operator.createTransaction(
+            txinfo,
+            this.keypair.privateKey,
+            this.state.getChainState(),
+            this.state.getTxPoolState()
+        );
+        return tx.payload.to.updated_balance;
+    }
+
     submitTransaction(dest: KeyObject, amount: number, fee: number): void {
         const txinfo: TransactionInfo = {
             from: this.keypair.publicKey,

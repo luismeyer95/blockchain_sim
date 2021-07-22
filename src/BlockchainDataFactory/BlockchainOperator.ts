@@ -171,7 +171,6 @@ export class BlockchainOperator implements IBlockchainOperator {
         }, 0);
         // TODO: remove hardcoded!!
         const blockReward = 10;
-        // const revChain = this.getReverseChain(chain);
         const to = this.createAccountOperation(
             keypair.publicKey,
             sumFees + blockReward,
@@ -180,7 +179,6 @@ export class BlockchainOperator implements IBlockchainOperator {
         );
         const payload = {
             to,
-            timestamp: Date.now(),
         };
         const payloadBuf = Buffer.from(JSON.stringify(payload));
         const signatureBuf = sign(payloadBuf, keypair.privateKey);
@@ -326,19 +324,14 @@ export class BlockchainOperator implements IBlockchainOperator {
         const prevBlock = this.getPreviousBlock(chain, block);
         const now = Date.now();
         const blockStamp = block.payload.timestamp;
-        const coinbaseStamp = block.payload.coinbase.payload.timestamp;
-        let blockCheck: boolean, coinbaseCheck: boolean;
+        let blockCheck: boolean;
         if (prevBlock) {
             const prevBlockStamp = prevBlock.payload.timestamp;
             blockCheck = prevBlockStamp < blockStamp && blockStamp < now;
-            coinbaseCheck =
-                prevBlockStamp < coinbaseStamp && coinbaseStamp < now;
         } else {
             blockCheck = blockStamp < now;
-            coinbaseCheck = coinbaseStamp < now;
         }
-        if (!blockCheck || !coinbaseCheck)
-            throw new Error("bad block timestamps");
+        if (!blockCheck) throw new Error("bad block timestamp");
     }
 
     private getPreviousBlock(
@@ -361,35 +354,6 @@ export class BlockchainOperator implements IBlockchainOperator {
         if (!verify(coinbasePayload, publicKeyMiner, coinbaseSig))
             throw new Error("bad block coinbase signature");
     }
-
-    private getReverseChain(
-        chain: BlockType[],
-        stopIndex: number = chain.length
-    ) {
-        return chain
-            .slice()
-            .filter((block) => block.payload.index < stopIndex)
-            .reverse();
-    }
-
-    // private verifyNoDupeRefWithinBlock(block: BlockType) {
-    //     const keyRefPairs = [
-    //         block.payload.coinbase.payload.to.last_ref +
-    //             block.payload.coinbase.payload.to.address,
-    //     ];
-    //     block.payload.txs.forEach((tx) => {
-    //         keyRefPairs.push(
-    //             tx.payload.from.last_ref + tx.payload.from.address
-    //         );
-    //         const toPairs = tx.payload.to.map((op) => op.last_ref + op.address);
-    //         keyRefPairs.push(...toPairs);
-    //     });
-    //     const keyRefPairSet = new Set(keyRefPairs);
-    //     if (keyRefPairs.length !== keyRefPairSet.size)
-    //         throw new Error(
-    //             "found dupe (last_ref, address) pair within block operations"
-    //         );
-    // }
 
     private verifyOperationSign(
         txOp: AccountOperationType,
