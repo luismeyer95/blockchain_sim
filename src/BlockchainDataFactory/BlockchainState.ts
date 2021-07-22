@@ -22,11 +22,8 @@ const storage = new BlockchainStorage();
 export class BlockchainState extends EventEmitter implements IBlockchainState {
     private operator: BlockchainOperator = new BlockchainOperator();
     private events: EventEmitter = new EventEmitter();
-    // private factory: IBlockchainDataFactory;
-
     private txpool: AccountTransactionType[] = [];
     private chain: BlockType[] = [];
-    // private log: ILogger;
     private log: ILogger = log;
 
     constructor() {
@@ -41,11 +38,11 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
         return this.txpool;
     }
 
-    onLocalBlockAppend(fn: (serializedBlock: string) => unknown) {
+    onLocalBlockAppend(fn: (block: unknown) => unknown) {
         this.events.on("block", fn);
     }
 
-    onLocalTransactionAppend(fn: (serializedTx: string) => unknown) {
+    onLocalTransactionAppend(fn: (tx: unknown) => unknown) {
         this.events.on("tx", fn);
     }
 
@@ -60,9 +57,7 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
         wallet.onTransaction((tx: AccountTransactionType) => {
             this.addTransaction(tx, {
                 onSuccess: () => {
-                    // const txSerial = JSON.stringify(tx);
-                    // this.protocol.broadcast("tx", txSerial);
-                    this.events.emit("tx", JSON.stringify(tx));
+                    this.events.emit("tx", tx);
                 },
                 onError: () => {},
             });
@@ -90,7 +85,7 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
                         if (resultChain.length > this.chain.length) {
                             console.log("~ BLOCK WAS MINED :) ~");
                             this.setChainState(resultChain);
-                            this.events.emit("block", JSON.stringify(block));
+                            this.events.emit("block", block);
                         }
                     },
                     onError: (missing) => {
@@ -174,22 +169,10 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
         } else callbacks.onError(null);
     }
 
-    // private logTxPool(msg: string) {
-    //     console.log(
-    //         msg,
-    //         JSON.stringify(
-    //             this.txpool.map((el) => el.header.signature),
-    //             null,
-    //             4
-    //         )
-    //     );
-    // }
-
     // updates the chain state and updates the transaction
     // cache to remove the ones that are included inside the blocks
     // that changed
     setChainState(chain: BlockType[]): void {
-        // this.logTxPool("BEFORE");
         const firstChangingBlock: BlockType | undefined = chain.find(
             (block, index) => {
                 if (index >= this.chain.length) return true;
@@ -208,7 +191,6 @@ export class BlockchainState extends EventEmitter implements IBlockchainState {
             this.chain.length - changeIndex,
             ...chainToAppend
         );
-        // this.logTxPool("AFTER");
         this.emit("change");
         storage.saveBlockchain(this.chain);
     }

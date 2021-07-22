@@ -33,17 +33,20 @@ export class Node {
         this.protocol = protocol;
         this.log = logger;
 
-        this.state.onLocalTransactionAppend((serializedTx: string) => {
-            this.protocol.broadcast("tx", serializedTx);
+        this.state.onLocalTransactionAppend((tx: unknown) => {
+            const serial = JSON.stringify(tx);
+            this.protocol.broadcast("tx", serial);
         });
 
-        this.state.onLocalBlockAppend((serializedBlock: string) => {
-            this.protocol.broadcast("block", serializedBlock);
+        this.state.onLocalBlockAppend((block: unknown) => {
+            const serial = JSON.stringify([block]);
+            this.protocol.broadcast("blocks", serial);
         });
 
         this.protocol.onBroadcast(
-            "block",
+            "blocks",
             (data: string, peer: string, relay: () => void) => {
+                this.log(`[node]: received broadcasted block\n`);
                 this.state.submitBlocks(data, {
                     onSuccess: () => {
                         this.log(`[node]: valid broadcasted block append\n`);
@@ -51,7 +54,12 @@ export class Node {
                     },
                     onError: (missing) => {
                         if (missing) {
+                            this.log(
+                                `[node]: missing blocks, requesting range\n`
+                            );
                             this.onMissingBlocks(missing, peer);
+                        } else {
+                            this.log(`[node]: bad broadcasted block\n`);
                         }
                     },
                 });
@@ -61,6 +69,8 @@ export class Node {
         this.protocol.onBroadcast(
             "tx",
             (data: string, peer: string, relay: () => void) => {
+                this.log(`[node]: received broadcasted tx\n`);
+                const obj = JSON.parse(data);
                 this.state.addTransaction(data, {
                     onSuccess: () => {
                         this.log(`[node]: valid broadcasted tx append\n`);

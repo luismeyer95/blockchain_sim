@@ -14,9 +14,9 @@ export default interface IBlockchainState extends EventEmitter {
         callbacks: SuccessErrorCallbacks<unknown[], [number, number] | null>
     ): void;
 
-    onLocalBlockAppend(fn: (serializedBlock: string) => unknown): void;
+    onLocalBlockAppend(ffn: (block: unknown) => unknown): void;
 
-    onLocalTransactionAppend(fn: (serializedTx: string) => unknown): void;
+    onLocalTransactionAppend(fn: (tx: unknown) => unknown): void;
 
     // updates the chain state and updates the transaction
     // cache to remove the ones that are included inside the blocks
