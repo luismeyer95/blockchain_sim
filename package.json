@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
         "test": "jest --verbose",
-        "build": "NODE_PATH='.' npx ts-node src/main.ts",
+        "start": "NODE_PATH='.' npx ts-node src/main.ts",
         "debug": "npx tsc --sourcemap"
     },
     "keywords": [],
